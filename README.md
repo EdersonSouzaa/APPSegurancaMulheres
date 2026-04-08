@@ -23,9 +23,8 @@ It helps prevent violence and provides quick support in dangerous moments.
 ## Technologies
 
 * React Native (mobile development)
-* JavaScript
-* Firebase (database and authentication)
-* Google Maps API (location and map services)
+* NodeJS
+* PostegreSQL (database and authentication)
 
 
 ## How to Run

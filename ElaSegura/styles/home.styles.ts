@@ -1,0 +1,212 @@
+import { StyleSheet, Platform } from 'react-native';
+
+export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F7D2F1', // Rosa do fundo conforme imagem
+  },
+  header: {
+    backgroundColor: '#FFF',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 15 : 10,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 0, // Curva leve no final do header como na ref
+    borderBottomRightRadius: 0,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconBox: {
+    width: 45,
+    height: 45,
+    borderRadius: 12,
+    backgroundColor: '#FFF0F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    zIndex: 1000,
+  },
+  headerGreeting: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  headerStatus: {
+    fontSize: 14,
+    color: '#6A6A75',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 100, // Espaço para não cobrir o conteúdo com a barra
+  },
+  mapCard: {
+    height: 220,
+    borderRadius: 35,
+    overflow: 'hidden',
+    marginBottom: 25,
+    backgroundColor: '#FFF',
+    elevation: 5,
+  },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 15,
+  },
+  quickAccessGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 25,
+  },
+  quickAccessCard: {
+    width: '23%',
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    paddingVertical: 15,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  quickAccessIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#FFF0F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  quickAccessLabel: {
+    fontSize: 9,
+    textAlign: 'center',
+    color: '#4A4A4A',
+    fontWeight: '700',
+  },
+  sosWrapper: {
+    alignItems: 'center',
+    marginVertical: 10,
+    marginBottom: 30,
+  },
+  sosButton: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#F35F74',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#F35F74',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  sosText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  occurrenceCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 25,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  occurrenceIconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFF0F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  occurrenceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  occurrenceDescription: {
+    fontSize: 13,
+    color: '#6A6A75',
+  },
+  occurrenceTime: {
+    fontSize: 11,
+    color: '#9C97AC',
+    marginTop: 4,
+  },
+  occurrenceInfo: { flex: 1 },
+  occurrenceTimeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+
+  // --- Adicionais para compatibilidade ---
+  quickAccessIconImage: {
+    width: 28,
+    height: 28,
+  },
+  sosRipple: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(243, 95, 116, 0.1)',
+  },
+  recentSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+
+  bottomNav: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 15,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    elevation: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+  },
+  navItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navIconActive: {
+    backgroundColor: '#FDF2F4',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 18,
+    alignItems: 'center',
+  },
+  navLabel: {
+    fontSize: 10,
+    color: '#9C97AC',
+    marginTop: 4,
+  },
+  navLabelActive: {
+    color: '#F35F74',
+    fontWeight: 'bold',
+  },
+});

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   View,
@@ -6,13 +6,26 @@ import {
   Image,
   TouchableOpacity,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { styles } from '../styles/home.styles';
 import { router } from 'expo-router';
 
 export default function Home() {
+    // Estado para controlar se o popup está aberto ou fechado
+  const [modalVisible, setModalVisible] = useState(false);
+
+    // MOCK DE DADOS
+  const mockOcorrencias = [
+    { id: 1, title: 'Roubo', desc: 'Pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error' },
+    { id: 2, title: 'Assédio', desc: 'Assoviaram para mim', time: '15 Abril, 11:30', type: 'error' },
+    { id: 3, title: 'Insegurança', desc: 'Rua muito escura e sem policiamento', time: '16 Abril, 20:15', type: 'warning' },
+    { id: 4, title: 'Tentativa de Furto', desc: 'Tentaram puxar minha bolsa', time: '18 Abril, 08:45', type: 'error' },
+    { id: 5, title: 'Assédio Verbal', desc: 'Comentários ofensivos no ônibus', time: '20 Abril, 14:20', type: 'error' },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
@@ -82,7 +95,12 @@ export default function Home() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>Ocorrências Recentes</Text>
+          <View style={styles.recentSectionHeader}>
+            <Text style={styles.sectionTitle}>Ocorrências Recentes</Text>
+            <TouchableOpacity onPress={() => setModalVisible(true)}>
+              <Text style={{ color: '#F35F74', fontWeight: 'bold' }}>Ver todas ❯</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Card de Ocorrência */}
           <View style={styles.occurrenceCard}>
@@ -107,7 +125,7 @@ export default function Home() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/ocorrencias')}>
           <MaterialIcons name="report-problem" size={24} color="#9C97AC" />
           <Text style={styles.navLabel}>Ocorrências</Text>
         </TouchableOpacity>
@@ -127,6 +145,47 @@ export default function Home() {
           <Text style={styles.navLabel}>Perfil</Text>
         </TouchableOpacity>
       </View>
+
+      {/* POPUP DE OCORRÊNCIAS (#29) */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.sectionTitle}>Últimas Ocorrências</Text>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => setModalVisible(false)}
+              >
+                <MaterialIcons name="close" size={28} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Aqui mapeamos o array mockado para gerar os cards automaticamente */}
+              {mockOcorrencias.map((item) => (
+                <View key={item.id} style={styles.occurrenceCard}>
+                  <View style={styles.occurrenceIconBox}>
+                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color="#F35F74" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.occurrenceTitle}>{item.title}</Text>
+                    <Text style={styles.occurrenceDescription}>{item.desc}</Text>
+                    <Text style={styles.occurrenceTime}>{item.time}</Text>
+                  </View>
+                </View>
+              ))}
+              
+              {/* Espaçador final do popup */}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

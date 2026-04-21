@@ -8,7 +8,8 @@ import {
   StatusBar,
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { styles } from '../styles/perfil.styles'; // Ajuste o caminho se necessário
+import { styles } from '../styles/perfil.styles';
+import { router } from 'expo-router';
 
 export default function Perfil() {
   return (
@@ -17,6 +18,12 @@ export default function Perfil() {
       
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={{ position: 'absolute', left: 20, top: 40, zIndex: 1 }} 
+            onPress={() => router.back()}
+          >
+            <MaterialIcons name="arrow-back" size={28} color="#1A1A1A" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Meu Perfil</Text>
           
           <View style={styles.avatarContainer}>

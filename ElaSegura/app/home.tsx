@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { styles } from '../styles/home.styles';
+import { router } from 'expo-router';
 
 const MAPA_IMAGE = require('../assets/images/mapa.png');
 const Ocorrencia_image = require('../assets/images/ocorrencia.png');
@@ -103,11 +104,17 @@ const Home = () => {
 
       {/* Barra de Navegação Inferior */}
       <View style={styles.bottomNav}>
-        <NavItem active icon={<MaterialIcons name="home" size={28} color="#F35F74" />} label="Início" />
-        <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color="#9C97AC" />} label="Ocorrencias" />
-        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color="#9C97AC" />} label="Contatos" />
-        <NavItem icon={<MaterialCommunityIcons name="bell-outline" size={28} color="#9C97AC" />} label="Alertas" />
-        <NavItem icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color="#9C97AC" />} label="Perfil" />
+        <NavItem active icon={<MaterialIcons name="home" size={28} color="#F35F74" />}
+        label="Início" />
+        <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color="#9C97AC" />}
+        label="Ocorrencias" />
+        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color="#9C97AC" />}
+        label="Contatos" />
+        <NavItem icon={<MaterialCommunityIcons name="bell-outline" size={28} color="#9C97AC" />}
+        label="Alertas" />
+        <NavItem icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color="#9C97AC" />}
+        label="Perfil"
+        onPress={() => router.push('/perfil')}/>
       </View>
     </View>
   );
@@ -138,8 +145,8 @@ const OccurrenceCard = ({ title, description, time }: any) => (
   </View>
 );
 
-const NavItem = ({ active, icon, label }: any) => (
-  <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
+const NavItem = ({ active, icon, label, onPress }: any) => (
+  <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={onPress}>
     <View style={active ? styles.navIconActive : undefined}>
       {icon}
     </View>

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { styles } from '../styles/home.styles';
+import { router } from 'expo-router';
 
 export default function Home() {
   return (
@@ -111,7 +112,7 @@ export default function Home() {
           <Text style={styles.navLabel}>Ocorrências</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/contatos')}>
           <MaterialIcons name="person-add" size={24} color="#9C97AC" />
           <Text style={styles.navLabel}>Contatos</Text>
         </TouchableOpacity>
@@ -121,7 +122,7 @@ export default function Home() {
           <Text style={styles.navLabel}>Alertas</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/perfil')}>
           <MaterialIcons name="account-circle" size={24} color="#9C97AC" />
           <Text style={styles.navLabel}>Perfil</Text>
         </TouchableOpacity>

@@ -209,4 +209,27 @@ export const styles = StyleSheet.create({
     color: '#F35F74',
     fontWeight: 'bold',
   },
+
+  // --- Estilos do Popup (Modal) ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)', // Fundo escurecido
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 20,
+    maxHeight: '80%', // Não ocupa a tela toda
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  closeButton: {
+    padding: 5,
+  },
 });

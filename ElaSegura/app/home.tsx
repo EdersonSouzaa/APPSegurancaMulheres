@@ -11,6 +11,8 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { styles } from '../styles/home.styles';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Modal } from 'react-native';
 
 const MAPA_IMAGE = require('../assets/images/mapa.png');
 const Ocorrencia_image = require('../assets/images/ocorrencia.png');
@@ -20,6 +22,15 @@ const Areas_image = require('../assets/images/areas.png');
 
 const Home = () => {
   const router = useRouter();
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const mockOcorrencias = [
+    { id: 1, title: 'Roubo', desc: 'pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error' },
+    { id: 2, title: 'Assédio', desc: 'assoviaram para mim', time: '15 Abril, 11:30', type: 'error' },
+    { id: 3, title: 'Insegurança', desc: 'Rua muito escura e sem policiamento', time: '16 Abril, 20:15', type: 'warning' },
+    { id: 4, title: 'Tentativa de Furto', desc: 'Tentaram puxar minha bolsa', time: '18 Abril, 08:45', type: 'error' },
+    { id: 5, title: 'Assédio Verbal', desc: 'Comentários ofensivos no ônibus', time: '20 Abril, 14:20', type: 'error' },
+  ];
   
   return (
     <View style={styles.container}>
@@ -52,12 +63,14 @@ const Home = () => {
             <QuickAccessCard
               icon={<Image source={Ocorrencia_image} style={[styles.quickAccessIconImage, { tintColor: '#F35F74' }]} resizeMode="contain" />}
               label="Ocorrências"
+              onPress={() => router.push('/ocorrencias')}
             />
 
             {/* 2. Contatos SOS */}
             <QuickAccessCard
               icon={<Image source={Contatos_image} style={[styles.quickAccessIconImage, { tintColor: '#F35F74' }]} resizeMode="contain" />}
               label="Contatos SOS"
+              onPress={() => router.push('/contatos')}
             />
 
             {/* 3. Alertas Recentes */}
@@ -85,6 +98,9 @@ const Home = () => {
           {/* Ocorrências Recentes */}
           <View style={styles.recentSectionHeader}>
             <Text style={styles.sectionTitle}>Ocorrências Recentes</Text>
+            <TouchableOpacity onPress={() => setModalVisible(true)}>
+              <Text style={{ color: '#F35F74', fontWeight: 'bold' }}>Ver todas ❯</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={{ gap: 15 }}>
@@ -105,13 +121,13 @@ const Home = () => {
       {/* Barra de Navegação Inferior */}
       <View style={styles.bottomNav}>
         <NavItem active icon={<MaterialIcons name="home" size={28} color="#F35F74" />} label="Início" />
-        <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color="#9C97AC" />} label="Ocorrencias" />
-        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color="#9C97AC" />} label="Contatos" />
+        <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color="#9C97AC" />} label="Ocorrencias" onPress={() => router.push('/ocorrencias')} />
+        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color="#9C97AC" />} label="Contatos" onPress={() => router.push('/contatos')} />
         <NavItem icon={<MaterialCommunityIcons name="bell-outline" size={28} color="#9C97AC" />} label="Alertas" />
         <NavItem 
           icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color="#9C97AC" />} 
           label="Perfil" 
-          onPress={() => {}} // Profile screen not implemented yet
+          onPress={() => router.push('/perfil')}
         />
         <NavItem 
           icon={<MaterialCommunityIcons name="cog-outline" size={28} color="#9C97AC" />} 
@@ -119,6 +135,44 @@ const Home = () => {
           onPress={() => router.push('/settings')}
         />
       </View>
+
+      {/* POPUP DE OCORRÊNCIAS */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.sectionTitle}>Últimas Ocorrências</Text>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => setModalVisible(false)}
+              >
+                <MaterialIcons name="close" size={28} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {mockOcorrencias.map((item) => (
+                <View key={item.id} style={styles.occurrenceCard}>
+                  <View style={styles.occurrenceIconBox}>
+                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color="#F35F74" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.occurrenceTitle}>{item.title}</Text>
+                    <Text style={styles.occurrenceDescription}>{item.desc}</Text>
+                    <Text style={styles.occurrenceTime}>{item.time}</Text>
+                  </View>
+                </View>
+              ))}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

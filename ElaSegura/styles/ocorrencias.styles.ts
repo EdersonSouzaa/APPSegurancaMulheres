@@ -63,4 +63,23 @@ export const styles = StyleSheet.create({
     color: '#9C97AC',
     marginTop: 6,
   },
+  addButton: {
+    backgroundColor: '#F35F74',
+    marginHorizontal: 20,
+    borderRadius: 25,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    elevation: 4,
+    shadowColor: '#F35F74',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  addButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });

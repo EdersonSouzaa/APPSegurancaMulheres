@@ -33,6 +33,11 @@ export default function Ocorrencias() {
         </View>
       </View>
 
+      {/* Botão Registrar Ocorrência */}
+      <TouchableOpacity style={styles.addButton} activeOpacity={0.8}>
+        <Text style={styles.addButtonText}>+ Registrar ocorrência</Text>
+      </TouchableOpacity>
+
       {/* Lista de Ocorrências */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
         {mockOcorrencias.map((item) => (

@@ -39,13 +39,6 @@ export default function Index() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={() => router.back()}
-            >
-              <MaterialCommunityIcons name="arrow-left" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-            
             <Image source={MULHER_IMAGE} style={styles.brandImage} resizeMode="contain" />
             <Text style={styles.brandTitle}>ElaSegura</Text>
             <Text style={styles.brandSubtitle}>Sua segurança é importante 💜</Text>

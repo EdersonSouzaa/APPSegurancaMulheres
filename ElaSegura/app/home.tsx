@@ -68,27 +68,31 @@ const Home = () => {
 
             {/* 2. Contatos SOS */}
             <QuickAccessCard
-              icon={<Image source={Contatos_image} style={[styles.quickAccessIconImage, { tintColor: '#F35F74' }]} resizeMode="contain" />}
+              icon={<Image source={Contatos_image} style={[styles.quickAccessIconImage, { tintColor: '#f25e75' }]} resizeMode="contain" />}
               label="Contatos SOS"
               onPress={() => router.push('/contatos')}
             />
 
             {/* 3. Alertas Recentes */}
             <QuickAccessCard
-              icon={<Image source={Alerta_image} style={[styles.quickAccessIconImage, { tintColor: '#F35F74' }]} resizeMode="contain" />}
+              icon={<Image source={Alerta_image} style={[styles.quickAccessIconImage, { tintColor: '#f25e75' }]} resizeMode="contain" />}
               label="Alertas Recentes"
             />
 
             {/* 4. Áreas de Risco */}
             <QuickAccessCard
-              icon={<Image source={Areas_image} style={[styles.quickAccessIconImage, { tintColor: '#F35F74' }]} resizeMode="contain" />}
+              icon={<Image source={Areas_image} style={[styles.quickAccessIconImage, { tintColor: '#f25e75' }]} resizeMode="contain" />}
               label="Áreas de risco"
             />
           </View>
 
           {/* Botão SOS centralizado */}
           <View style={styles.sosWrapper}>
-            <TouchableOpacity style={styles.sosButton} activeOpacity={0.8}>
+            <TouchableOpacity 
+              style={styles.sosButton} 
+              activeOpacity={0.8}
+              onPress={() => router.push('/sos' as any)}
+            >
               <MaterialCommunityIcons name="shield-alert" size={45} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -118,10 +122,14 @@ const Home = () => {
 
       {/* Barra de Navegação Inferior */}
       <View style={styles.bottomNav}>
-        <NavItem active icon={<MaterialIcons name="home" size={28} color="#F35F74" />} label="Início" />
+        <NavItem active icon={<MaterialIcons name="home" size={28} color="#f25e75" />} label="Início" />
         <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color="#9C97AC" />} label="Ocorrencias" onPress={() => router.push('/ocorrencias')} />
         <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color="#9C97AC" />} label="Contatos" onPress={() => router.push('/contatos')} />
-        <NavItem icon={<MaterialCommunityIcons name="bell-outline" size={28} color="#9C97AC" />} label="Alertas" />
+        <NavItem 
+          icon={<MaterialCommunityIcons name="bell-outline" size={28} color="#9C97AC" />} 
+          label="Alertas" 
+          onPress={() => router.push('/alertas' as any)}
+        />
         <NavItem 
           icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color="#9C97AC" />} 
           label="Perfil" 
@@ -175,8 +183,8 @@ const Home = () => {
   );
 };
 
-const QuickAccessCard = ({ icon, label }: any) => (
-  <TouchableOpacity style={styles.quickAccessCard} activeOpacity={0.7}>
+const QuickAccessCard = ({ icon, label, onPress }: any) => (
+  <TouchableOpacity style={styles.quickAccessCard} activeOpacity={0.7} onPress={onPress}>
     <View style={styles.quickAccessIconBox}>
       {icon}
     </View>

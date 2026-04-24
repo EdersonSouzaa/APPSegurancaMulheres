@@ -61,7 +61,7 @@ const Home = () => {
           <View style={styles.quickAccessGrid}>
             {/* 1. Ocorrências */}
             <QuickAccessCard
-              icon={<Image source={Ocorrencia_image} style={[styles.quickAccessIconImage, { tintColor: '#F35F74' }]} resizeMode="contain" />}
+              icon={<MaterialCommunityIcons name="file-alert-outline" size={28} color="#f25e75" />}
               label="Ocorrências"
               onPress={() => router.push('/ocorrencias')}
             />
@@ -88,10 +88,8 @@ const Home = () => {
 
           {/* Botão SOS centralizado */}
           <View style={styles.sosWrapper}>
-            <View style={styles.sosRipple} />
             <TouchableOpacity style={styles.sosButton} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="shield-check-outline" size={35} color="#FFFFFF" />
-              <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>SOS</Text>
+              <MaterialCommunityIcons name="shield-alert" size={45} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -159,7 +157,7 @@ const Home = () => {
               {mockOcorrencias.map((item) => (
                 <View key={item.id} style={styles.occurrenceCard}>
                   <View style={styles.occurrenceIconBox}>
-                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color="#F35F74" />
+                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color="#f25e75" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.occurrenceTitle}>{item.title}</Text>
@@ -189,7 +187,7 @@ const QuickAccessCard = ({ icon, label }: any) => (
 const OccurrenceCard = ({ title, description, time }: any) => (
   <View style={styles.occurrenceCard}>
     <View style={styles.occurrenceIconBox}>
-      <MaterialCommunityIcons name="alert-circle" size={30} color="#F35F74" />
+      <MaterialCommunityIcons name="alert-circle" size={30} color="#f25e75" />
     </View>
     <View style={styles.occurrenceInfo}>
       <Text style={styles.occurrenceTitle}>{title}</Text>

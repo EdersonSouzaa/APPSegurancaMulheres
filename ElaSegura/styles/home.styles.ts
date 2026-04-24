@@ -106,13 +106,9 @@ export const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: '#F35F74',
+    backgroundColor: '#f25e75',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 10,
-    shadowColor: '#F35F74',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
   },
   sosText: {
     color: '#FFF',
@@ -158,13 +154,6 @@ export const styles = StyleSheet.create({
     width: 28,
     height: 28,
   },
-  sosRipple: {
-    position: 'absolute',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(243, 95, 116, 0.1)',
-  },
   recentSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -206,7 +195,7 @@ export const styles = StyleSheet.create({
     marginTop: 4,
   },
   navLabelActive: {
-    color: '#F35F74',
+    color: '#f25e75',
     fontWeight: 'bold',
   },
 

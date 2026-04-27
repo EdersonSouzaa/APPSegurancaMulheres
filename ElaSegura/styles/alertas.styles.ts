@@ -1,9 +1,9 @@
 import { StyleSheet, Platform } from 'react-native';
 
-export const styles = StyleSheet.create({
+export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF7F9', // Light pinkish background
+    backgroundColor: colors.background, 
   },
   header: {
     paddingHorizontal: 20,
@@ -20,11 +20,11 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6A6A75',
+    color: colors.secondary,
     marginTop: 5,
   },
   emptyStateContainer: {
@@ -32,13 +32,13 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
-    marginTop: -50, // Slightly above center for better visual balance
+    marginTop: -50,
   },
   emptyStateIconBox: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 25,
@@ -51,13 +51,13 @@ export const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 10,
   },
   emptyStateDescription: {
     fontSize: 15,
-    color: '#9C97AC',
+    color: colors.secondary,
     textAlign: 'center',
     lineHeight: 22,
   },

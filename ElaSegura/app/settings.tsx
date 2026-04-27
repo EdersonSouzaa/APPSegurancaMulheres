@@ -8,56 +8,115 @@ import {
   StatusBar,
   ScrollView,
   Switch,
+  Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Settings() {
   const router = useRouter();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [isNotificationsEnabled, setIsNotificationsEnabled] = React.useState(true);
   const [isLocationEnabled, setIsLocationEnabled] = React.useState(true);
 
+  // Cores dinâmicas
+  const colors = {
+    bg: isDarkMode ? '#121212' : '#F7D2F1',
+    cardBg: isDarkMode ? '#1E1E1E' : '#FFF',
+    text: isDarkMode ? '#FFFFFF' : '#1A1A1A',
+    subtitle: isDarkMode ? '#A0A0A0' : '#9C97AC',
+    primary: '#F35F74',
+    border: isDarkMode ? '#333333' : '#F0F0F0',
+    headerBg: isDarkMode ? '#121212' : '#F7D2F1',
+    iconBox: isDarkMode ? '#2D2D2D' : '#FFF5F6',
+    backBtnBg: isDarkMode ? '#2D2D2D' : '#FFF',
+  };
+
   const SettingItem = ({ icon, title, subtitle, onPress, isLast, rightElement }: any) => (
     <TouchableOpacity 
-      style={[styles.settingItem, isLast && styles.lastItem]} 
+      style={[
+        styles.settingItem, 
+        { borderBottomColor: colors.border },
+        isLast && styles.lastItem
+      ]} 
       onPress={onPress}
       activeOpacity={0.7}
       disabled={!onPress}
     >
-      <View style={styles.settingIconBox}>
-        <MaterialCommunityIcons name={icon} size={24} color="#F35F74" />
+      <View style={[styles.settingIconBox, { backgroundColor: colors.iconBox }]}>
+        <MaterialCommunityIcons name={icon} size={24} color={colors.primary} />
       </View>
       <View style={styles.settingTextContainer}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+        <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+        {subtitle && <Text style={[styles.settingSubtitle, { color: colors.subtitle }]}>{subtitle}</Text>}
       </View>
       {rightElement ? rightElement : (
-        onPress && <MaterialCommunityIcons name="chevron-right" size={24} color="#9C97AC" />
+        onPress && <MaterialCommunityIcons name="chevron-right" size={24} color={colors.subtitle} />
       )}
     </TouchableOpacity>
   );
 
   const Section = ({ title, children }: any) => (
     <View style={styles.section}>
-      <Text style={styles.sectionHeader}>{title}</Text>
-      <View style={styles.sectionContent}>
+      <Text style={[styles.sectionHeader, { color: colors.primary }]}>{title}</Text>
+      <View style={[styles.sectionContent, { backgroundColor: colors.cardBg }]}>
         {children}
       </View>
     </View>
   );
 
+  const MoonSwitch = () => {
+    const animatedValue = React.useRef(new Animated.Value(isDarkMode ? 1 : 0)).current;
+
+    React.useEffect(() => {
+      Animated.timing(animatedValue, {
+        toValue: isDarkMode ? 1 : 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    }, [isDarkMode]);
+
+    const translateX = animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [2, 22],
+    });
+
+    const backgroundColor = animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['#D1D1D1', '#4D4D4D'],
+    });
+
+    return (
+      <TouchableOpacity 
+        activeOpacity={0.8} 
+        onPress={toggleTheme}
+      >
+        <Animated.View style={[styles.customSwitchContainer, { backgroundColor }]}>
+          <Animated.View style={[styles.customSwitchThumb, { transform: [{ translateX }] }]}>
+            <MaterialCommunityIcons 
+              name={isDarkMode ? "moon-waning-crescent" : "white-balance-sunny"} 
+              size={16} 
+              color={isDarkMode ? "#FFD700" : "#FFA500"} 
+            />
+          </Animated.View>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7D2F1" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.headerBg} />
       
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
         <TouchableOpacity 
-          style={styles.backButton} 
+          style={[styles.backButton, { backgroundColor: colors.backBtnBg }]} 
           onPress={() => router.back()}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#1A1A1A" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configurações</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Configurações</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -86,7 +145,7 @@ export default function Settings() {
               <Switch 
                 value={isLocationEnabled} 
                 onValueChange={setIsLocationEnabled}
-                trackColor={{ false: '#D1D1D1', true: '#F35F74' }}
+                trackColor={{ false: '#D1D1D1', true: colors.primary }}
                 thumbColor={'#FFF'}
               />
             }
@@ -103,10 +162,20 @@ export default function Settings() {
               <Switch 
                 value={isNotificationsEnabled} 
                 onValueChange={setIsNotificationsEnabled}
-                trackColor={{ false: '#D1D1D1', true: '#F35F74' }}
+                trackColor={{ false: '#D1D1D1', true: colors.primary }}
                 thumbColor={'#FFF'}
               />
             }
+            isLast
+          />
+        </Section>
+
+        <Section title="Temas">
+          <SettingItem 
+            icon="theme-light-dark" 
+            title="Tema do Aplicativo" 
+            subtitle={isDarkMode ? "Tema Escuro Ativado" : "Tema Padrão Original"}
+            rightElement={<MoonSwitch />}
             isLast
           />
         </Section>
@@ -125,12 +194,16 @@ export default function Settings() {
           />
         </Section>
 
-        <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={() => router.replace('/login')}>
-          <MaterialCommunityIcons name="logout" size={22} color="#F35F74" />
-          <Text style={styles.logoutText}>Sair da Conta</Text>
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: colors.cardBg, borderColor: isDarkMode ? '#333' : '#FFDEDE' }]} 
+          activeOpacity={0.8} 
+          onPress={() => router.replace('/login')}
+        >
+          <MaterialCommunityIcons name="logout" size={22} color={colors.primary} />
+          <Text style={[styles.logoutText, { color: colors.primary }]}>Sair da Conta</Text>
         </TouchableOpacity>
         
-        <Text style={styles.versionText}>Versão 1.0.0</Text>
+        <Text style={[styles.versionText, { color: colors.subtitle }]}>Versão 1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -139,20 +212,17 @@ export default function Settings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7D2F1',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 20,
-    backgroundColor: '#F7D2F1',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 2,
@@ -164,7 +234,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1A1A1A',
     marginLeft: 16,
   },
   scrollContent: {
@@ -177,12 +246,10 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#F35F74',
     marginBottom: 12,
     marginLeft: 4,
   },
   sectionContent: {
-    backgroundColor: '#FFF',
     borderRadius: 24,
     overflow: 'hidden',
     elevation: 3,
@@ -196,7 +263,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   lastItem: {
     borderBottomWidth: 0,
@@ -205,7 +271,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#FFF5F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -216,35 +281,49 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
   },
   settingSubtitle: {
     fontSize: 13,
-    color: '#9C97AC',
     marginTop: 2,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF',
     padding: 16,
     borderRadius: 20,
     marginTop: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#FFDEDE',
   },
   logoutText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#F35F74',
     marginLeft: 10,
   },
   versionText: {
     textAlign: 'center',
     fontSize: 12,
-    color: '#9C97AC',
     marginBottom: 20,
+  },
+  customSwitchContainer: {
+    width: 50,
+    height: 28,
+    borderRadius: 15,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  customSwitchThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
 });

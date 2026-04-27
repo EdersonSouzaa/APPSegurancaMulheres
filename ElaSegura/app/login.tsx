@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,14 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
 
 const MULHER_IMAGE = require('../assets/images/mulher.png');
 
 export default function Login() {
   const router = useRouter();
+  const { isDarkMode, theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,6 +29,9 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   const handleLogin = () => {
     // Navigate to home
@@ -46,25 +52,25 @@ export default function Login() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7D2F1" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Image source={MULHER_IMAGE} style={styles.brandImage} resizeMode="contain" />
+            <Image source={MULHER_IMAGE} style={[styles.brandImage, isDarkMode && { tintColor: colors.primary }]} resizeMode="contain" />
             <Text style={styles.brandTitle}>ElaSegura</Text>
             <Text style={styles.brandSubtitle}>Sua segurança é importante 💜</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="email-outline" size={24} color="#9C97AC" style={styles.inputIcon} />
+              <MaterialCommunityIcons name="email-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="E-mail"
-                placeholderTextColor="#9C97AC"
+                placeholderTextColor={colors.secondary}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -73,11 +79,11 @@ export default function Login() {
             </View>
 
             <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="lock-outline" size={24} color="#9C97AC" style={styles.inputIcon} />
+              <MaterialCommunityIcons name="lock-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Senha"
-                placeholderTextColor="#9C97AC"
+                placeholderTextColor={colors.secondary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -86,7 +92,7 @@ export default function Login() {
                 <MaterialCommunityIcons 
                   name={showPassword ? "eye-off-outline" : "eye-outline"} 
                   size={24} 
-                  color="#9C97AC" 
+                  color={colors.secondary} 
                 />
               </TouchableOpacity>
             </View>
@@ -112,7 +118,7 @@ export default function Login() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Modal de Recuperar Senha (Redefinição Direta) */}
+      {/* Modal de Recuperar Senha */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -124,7 +130,7 @@ export default function Login() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Redefinir Senha</Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#1A1A1A" />
+                <MaterialCommunityIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             
@@ -133,11 +139,11 @@ export default function Login() {
             </Text>
 
             <View style={styles.modalInputContainer}>
-              <MaterialCommunityIcons name="lock-outline" size={20} color="#9C97AC" style={styles.inputIcon} />
+              <MaterialCommunityIcons name="lock-outline" size={20} color={colors.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.modalInput}
                 placeholder="Nova Senha"
-                placeholderTextColor="#9C97AC"
+                placeholderTextColor={colors.secondary}
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry={!showNewPassword}
@@ -146,17 +152,17 @@ export default function Login() {
                 <MaterialCommunityIcons 
                   name={showNewPassword ? "eye-off-outline" : "eye-outline"} 
                   size={20} 
-                  color="#9C97AC" 
+                  color={colors.secondary} 
                 />
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalInputContainer}>
-              <MaterialCommunityIcons name="lock-check-outline" size={20} color="#9C97AC" style={styles.inputIcon} />
+              <MaterialCommunityIcons name="lock-check-outline" size={20} color={colors.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.modalInput}
                 placeholder="Confirmar Nova Senha"
-                placeholderTextColor="#9C97AC"
+                placeholderTextColor={colors.secondary}
                 value={confirmNewPassword}
                 onChangeText={setConfirmNewPassword}
                 secureTextEntry={!showNewPassword}
@@ -177,10 +183,10 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7D2F1',
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -202,16 +208,16 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FF1493',
+    color: isDarkMode ? colors.primary : '#FF1493',
     marginBottom: 5,
   },
   brandSubtitle: {
     fontSize: 16,
-    color: '#1A1A1A',
+    color: colors.text,
     fontWeight: '500',
   },
   form: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     padding: 24,
     borderRadius: 30,
     elevation: 5,
@@ -223,13 +229,13 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: isDarkMode ? '#252525' : '#F8F8F8',
     borderRadius: 16,
     marginBottom: 16,
     paddingHorizontal: 16,
     height: 56,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
+    borderColor: colors.border,
   },
   inputIcon: {
     marginRight: 12,
@@ -237,28 +243,24 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#1A1A1A',
+    color: colors.text,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
     marginBottom: 24,
   },
   forgotPasswordText: {
-    color: '#F35F74',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   loginButton: {
-    backgroundColor: '#F35F74',
+    backgroundColor: colors.primary,
     borderRadius: 16,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 3,
-    shadowColor: '#F35F74',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
   },
   loginButtonText: {
     color: '#FFF',
@@ -271,32 +273,27 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   footerText: {
-    color: '#6A6A75',
+    color: colors.secondary,
     fontSize: 15,
   },
   footerLink: {
-    color: '#F35F74',
+    color: colors.primary,
     fontSize: 15,
     fontWeight: 'bold',
   },
-  // Estilos do Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     width: '100%',
     borderRadius: 30,
     padding: 24,
     elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -307,32 +304,32 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   modalDescription: {
     fontSize: 15,
-    color: '#6A6A75',
+    color: colors.secondary,
     marginBottom: 20,
     lineHeight: 22,
   },
   modalInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: isDarkMode ? '#252525' : '#F8F8F8',
     borderRadius: 12,
     marginBottom: 20,
     paddingHorizontal: 16,
     height: 50,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
+    borderColor: colors.border,
   },
   modalInput: {
     flex: 1,
     fontSize: 15,
-    color: '#1A1A1A',
+    color: colors.text,
   },
   modalButton: {
-    backgroundColor: '#F35F74',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     height: 50,
     justifyContent: 'center',

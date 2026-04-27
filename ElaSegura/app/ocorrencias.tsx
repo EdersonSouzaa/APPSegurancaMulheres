@@ -2,11 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { styles } from '../styles/ocorrencias.styles';
+import { getStyles } from '../styles/ocorrencias.styles';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
 
 export default function Ocorrencias() {
+  const { isDarkMode, theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'gerais' | 'proximas'>('proximas');
   const [radiusFilter, setRadiusFilter] = useState<number>(1000); // em metros
+
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   const mockOcorrencias = [
     { id: 1, title: 'Roubo', desc: 'Pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error', distance: 250 },
@@ -37,7 +43,7 @@ export default function Ocorrencias() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? colors.background : colors.background} />
 
       {/* Cabeçalho */}
       <View style={styles.header}>
@@ -45,7 +51,7 @@ export default function Ocorrencias() {
           style={{ marginRight: 15 }} 
           onPress={() => router.back()}
         >
-          <MaterialIcons name="arrow-back" size={28} color="#1A1A1A" />
+          <MaterialIcons name="arrow-back" size={28} color={colors.text} />
         </TouchableOpacity>
         <View>
           <Text style={styles.headerTitle}>Ocorrências</Text>
@@ -95,7 +101,7 @@ export default function Ocorrencias() {
           filteredOcorrencias.map((item) => (
             <View key={item.id} style={styles.occurrenceCard}>
               <View style={styles.occurrenceIconBox}>
-                <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color="#F35F74" />
+                <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -106,7 +112,7 @@ export default function Ocorrencias() {
                 
                 <View style={styles.distanceBadge}>
                   <Text style={styles.distanceText}>
-                    <MaterialCommunityIcons name="map-marker-distance" size={12} color="#F35F74" /> {item.distance >= 1000 ? `${(item.distance/1000).toFixed(1)}km` : `${item.distance}m`} de distância
+                    <MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.primary} /> {item.distance >= 1000 ? `${(item.distance/1000).toFixed(1)}km` : `${item.distance}m`} de distância
                   </Text>
                 </View>
               </View>
@@ -114,7 +120,7 @@ export default function Ocorrencias() {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="map-marker-off-outline" size={60} color="#EFEFEF" />
+            <MaterialCommunityIcons name="map-marker-off-outline" size={60} color={isDarkMode ? "#333" : "#EFEFEF"} />
             <Text style={styles.emptyText}>Nenhuma ocorrência neste raio.</Text>
           </View>
         )}

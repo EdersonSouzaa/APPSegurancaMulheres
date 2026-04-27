@@ -1,13 +1,19 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StatusBar } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { styles } from '../styles/contatos.styles';
+import { getStyles } from '../styles/contatos.styles';
 import { router } from 'expo-router';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
 
 export default function Contatos() {
+  const { isDarkMode, theme } = useTheme();
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
 
       {/* Cabeçalho */}
      <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
@@ -15,7 +21,7 @@ export default function Contatos() {
           style={{ marginRight: 15 }} 
           onPress={() => router.back()}
         >
-          <MaterialIcons name="arrow-back" size={28} color="#1A1A1A" />
+          <MaterialIcons name="arrow-back" size={28} color={colors.text} />
         </TouchableOpacity>
         <View>
             <Text style={styles.headerTitle}>Contatos de Confiança</Text>
@@ -29,7 +35,7 @@ export default function Contatos() {
 
       {/* Estado Vazio (Nenhum contato) */}
       <View style={styles.emptyStateContainer}>
-        <MaterialIcons name="account-circle" size={100} color="#1A1A1A" />
+        <MaterialIcons name="account-circle" size={100} color={isDarkMode ? colors.secondary : "#1A1A1A"} />
         <Text style={styles.emptyStateTitle}>Nenhum contato adicionado</Text>
         <Text style={styles.emptyStateText}>
           Adicione contatos de confiança para enviar alertas

@@ -1,9 +1,9 @@
 import { StyleSheet, Platform } from 'react-native';
 
-export const styles = StyleSheet.create({
+export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF7F9', // Light pinkish background
+    backgroundColor: colors.background, 
     alignItems: 'center',
     justifyContent: 'center',
     padding: 30,
@@ -19,24 +19,24 @@ export const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: '#FCE4E8',
+    backgroundColor: isDarkMode ? '#2D1619' : '#FCE4E8',
   },
   iconInnerGlow: {
     position: 'absolute',
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#F9D0D7',
+    backgroundColor: isDarkMode ? '#3D1A20' : '#F9D0D7',
   },
   mainIconCircle: {
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: '#f25e75',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
-    shadowColor: '#f25e75',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -44,13 +44,13 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 15,
   },
   description: {
     fontSize: 16,
-    color: '#6A6A75',
+    color: colors.secondary,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 20,
@@ -63,7 +63,7 @@ export const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 14,
-    color: '#9C97AC',
+    color: colors.secondary,
     marginLeft: 5,
   },
   buttonContainer: {
@@ -71,14 +71,14 @@ export const styles = StyleSheet.create({
     gap: 15,
   },
   sendButton: {
-    backgroundColor: '#f25e75',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     height: 65,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
-    shadowColor: '#f25e75',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -90,16 +90,16 @@ export const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cancelButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardBackground,
     height: 65,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
   },
   cancelButtonText: {
-    color: '#1A1A1A',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
   },

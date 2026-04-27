@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,19 @@ import {
   StatusBar,
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { styles } from '../styles/perfil.styles';
+import { getStyles } from '../styles/perfil.styles';
 import { router } from 'expo-router';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
 
 export default function Perfil() {
+  const { isDarkMode, theme } = useTheme();
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
@@ -22,7 +28,7 @@ export default function Perfil() {
             style={{ position: 'absolute', left: 20, top: 40, zIndex: 1 }} 
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={28} color="#1A1A1A" />
+            <MaterialIcons name="arrow-back" size={28} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Meu Perfil</Text>
           
@@ -43,7 +49,7 @@ export default function Perfil() {
             <TextInput 
               style={styles.input}
               placeholder="seu@email.com"
-              placeholderTextColor="#9C97AC"
+              placeholderTextColor={colors.secondary}
               keyboardType="email-address"
             />
           </View>
@@ -53,7 +59,7 @@ export default function Perfil() {
             <TextInput 
               style={styles.input}
               placeholder="85999999999"
-              placeholderTextColor="#9C97AC"
+              placeholderTextColor={colors.secondary}
               keyboardType="phone-pad"
             />
           </View>
@@ -63,7 +69,7 @@ export default function Perfil() {
             <TextInput 
               style={styles.input}
               placeholder="Seu Endereço"
-              placeholderTextColor="#9C97AC"
+              placeholderTextColor={colors.secondary}
             />
           </View>
 
@@ -72,7 +78,7 @@ export default function Perfil() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.logoutButton} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="logout" size={20} color="#F35F74" />
+            <MaterialCommunityIcons name="logout" size={20} color={colors.primary} />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </TouchableOpacity>
         </View>

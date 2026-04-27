@@ -1,9 +1,9 @@
 import { StyleSheet, Platform } from 'react-native';
 
-export const styles = StyleSheet.create({
+export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7D2F1', // O mesmo fundo rosa da Home
+    backgroundColor: colors.background, 
   },
   header: {
     paddingHorizontal: 20,
@@ -13,15 +13,15 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6A6A75',
+    color: colors.secondary,
     marginTop: 5,
   },
   addButton: {
-    backgroundColor: '#F35F74',
+    backgroundColor: colors.primary,
     marginHorizontal: 20,
     borderRadius: 20,
     height: 50,
@@ -45,12 +45,12 @@ export const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
     marginTop: 15,
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#6A6A75',
+    color: colors.secondary,
     textAlign: 'center',
     marginTop: 10,
   },

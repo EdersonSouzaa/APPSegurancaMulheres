@@ -1,17 +1,15 @@
 import { StyleSheet, Platform } from 'react-native';
 
-export const styles = StyleSheet.create({
+export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7D2F1', // Rosa do fundo conforme imagem
+    backgroundColor: colors.background,
   },
   header: {
-    backgroundColor: '#FFF',
+    backgroundColor: isDarkMode ? colors.cardBackground : '#FFF',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 15 : 10,
     paddingBottom: 20,
-    borderBottomLeftRadius: 0, // Curva leve no final do header como na ref
-    borderBottomRightRadius: 0,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -26,7 +24,7 @@ export const styles = StyleSheet.create({
     width: 45,
     height: 45,
     borderRadius: 12,
-    backgroundColor: '#FFF0F2',
+    backgroundColor: isDarkMode ? colors.accent : '#FFF0F2',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -35,25 +33,25 @@ export const styles = StyleSheet.create({
   headerGreeting: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   headerStatus: {
     fontSize: 14,
-    color: '#6A6A75',
+    color: colors.secondary,
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 20,
-    paddingBottom: 100, // Espaço para não cobrir o conteúdo com a barra
+    paddingBottom: 100,
   },
   mapCard: {
     height: 220,
     borderRadius: 35,
     overflow: 'hidden',
     marginBottom: 25,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     elevation: 5,
   },
   mapImage: {
@@ -63,7 +61,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.text,
     marginBottom: 15,
   },
   quickAccessGrid: {
@@ -73,7 +71,7 @@ export const styles = StyleSheet.create({
   },
   quickAccessCard: {
     width: '23%',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 24,
     paddingVertical: 15,
     alignItems: 'center',
@@ -86,7 +84,7 @@ export const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#FFF0F2',
+    backgroundColor: isDarkMode ? colors.accent : '#FFF0F2',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -94,7 +92,7 @@ export const styles = StyleSheet.create({
   quickAccessLabel: {
     fontSize: 9,
     textAlign: 'center',
-    color: '#4A4A4A',
+    color: colors.text,
     fontWeight: '700',
   },
   sosWrapper: {
@@ -106,7 +104,7 @@ export const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: '#f25e75',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -117,7 +115,7 @@ export const styles = StyleSheet.create({
     marginTop: 2,
   },
   occurrenceCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     borderRadius: 25,
     padding: 18,
     flexDirection: 'row',
@@ -128,7 +126,7 @@ export const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#FFF0F2',
+    backgroundColor: isDarkMode ? colors.accent : '#FFF0F2',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
@@ -136,20 +134,19 @@ export const styles = StyleSheet.create({
   occurrenceTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: colors.text,
   },
   occurrenceDescription: {
     fontSize: 13,
-    color: '#6A6A75',
+    color: colors.secondary,
   },
   occurrenceTime: {
     fontSize: 11,
-    color: '#9C97AC',
+    color: colors.secondary,
     marginTop: 4,
   },
   occurrenceInfo: { flex: 1 },
   occurrenceTimeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-
-  // --- Adicionais para compatibilidade ---
   quickAccessIconImage: {
     width: 28,
     height: 28,
@@ -160,14 +157,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
-
   bottomNav: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 30 : 15,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
     elevation: 25,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -5 },
@@ -183,7 +177,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navIconActive: {
-    backgroundColor: '#FDF2F4',
+    backgroundColor: isDarkMode ? colors.accent : '#FDF2F4',
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 18,
@@ -191,26 +185,24 @@ export const styles = StyleSheet.create({
   },
   navLabel: {
     fontSize: 10,
-    color: '#9C97AC',
+    color: colors.secondary,
     marginTop: 4,
   },
   navLabelActive: {
-    color: '#f25e75',
+    color: colors.primary,
     fontWeight: 'bold',
   },
-
-  // --- Estilos do Popup (Modal) ---
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)', // Fundo escurecido
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.cardBackground,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 20,
-    maxHeight: '80%', // Não ocupa a tela toda
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',

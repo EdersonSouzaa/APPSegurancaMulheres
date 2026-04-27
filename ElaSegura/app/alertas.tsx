@@ -1,20 +1,26 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { styles } from '../styles/alertas.styles';
+import { getStyles } from '../styles/alertas.styles';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
 
 const AlertasScreen = () => {
   const router = useRouter();
+  const { isDarkMode, theme } = useTheme();
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <MaterialCommunityIcons name="arrow-left" size={28} color="#1A1A1A" />
+            <MaterialCommunityIcons name="arrow-left" size={28} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.title}>Alertas</Text>
         </View>
@@ -24,7 +30,7 @@ const AlertasScreen = () => {
       {/* Empty State */}
       <View style={styles.emptyStateContainer}>
         <View style={styles.emptyStateIconBox}>
-          <MaterialCommunityIcons name="bell-off-outline" size={60} color="#f25e75" />
+          <MaterialCommunityIcons name="bell-off-outline" size={60} color={colors.primary} />
         </View>
         <Text style={styles.emptyStateTitle}>Tudo tranquilo por aqui</Text>
         <Text style={styles.emptyStateDescription}>

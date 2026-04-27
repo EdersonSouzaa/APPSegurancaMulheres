@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
 import {
   View,
   Text,
@@ -10,11 +9,14 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { styles } from '../styles/home.styles';
+import { getStyles } from '../styles/home.styles';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Modal } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
 
 const MAPA_IMAGE = require('../assets/images/mapa.png');
 const Ocorrencia_image = require('../assets/images/ocorrencia.png');
@@ -35,7 +37,11 @@ if (Platform.OS !== 'web') {
 
 const Home = () => {
   const router = useRouter();
+  const { isDarkMode, theme } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
+  
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -47,14 +53,6 @@ const Home = () => {
     })();
   }, []);
 
-  const mockOcorrencias = [
-    { id: 1, title: 'Roubo', desc: 'pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error' },
-    { id: 2, title: 'Assédio', desc: 'assoviaram para mim', time: '15 Abril, 11:30', type: 'error' },
-    { id: 3, title: 'Insegurança', desc: 'Rua muito escura e sem policiamento', time: '16 Abril, 20:15', type: 'warning' },
-    { id: 4, title: 'Tentativa de Furto', desc: 'Tentaram puxar minha bolsa', time: '18 Abril, 08:45', type: 'error' },
-    { id: 5, title: 'Assédio Verbal', desc: 'Comentários ofensivos no ônibus', time: '20 Abril, 14:20', type: 'error' },
-  ];
-  
   const triggerDangerZoneAlert = async () => {
     if (Platform.OS === 'web') {
       alert("⚠️ Atenção: Área de Risco\nVocê está se aproximando de uma região com alto índice de ocorrências. (Simulação na Web)");
@@ -70,9 +68,17 @@ const Home = () => {
     });
   };
 
+  const mockOcorrencias = [
+    { id: 1, title: 'Roubo', desc: 'pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error' },
+    { id: 2, title: 'Assédio', desc: 'assoviaram para mim', time: '15 Abril, 11:30', type: 'error' },
+    { id: 3, title: 'Insegurança', desc: 'Rua muito escura e sem policiamento', time: '16 Abril, 20:15', type: 'warning' },
+    { id: 4, title: 'Tentativa de Furto', desc: 'Tentaram puxar minha bolsa', time: '18 Abril, 08:45', type: 'error' },
+    { id: 5, title: 'Assédio Verbal', desc: 'Comentários ofensivos no ônibus', time: '20 Abril, 14:20', type: 'error' },
+  ];
+  
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? colors.cardBackground : "#FFF"} />
 
       <ScrollView
         style={styles.scrollView}
@@ -99,27 +105,31 @@ const Home = () => {
           <View style={styles.quickAccessGrid}>
             {/* 1. Ocorrências */}
             <QuickAccessCard
-              icon={<MaterialCommunityIcons name="file-alert-outline" size={28} color="#f25e75" />}
+              styles={styles}
+              icon={<MaterialCommunityIcons name="file-alert-outline" size={28} color={colors.primary} />}
               label="Ocorrências"
               onPress={() => router.push('/ocorrencias')}
             />
 
             {/* 2. Contatos SOS */}
             <QuickAccessCard
-              icon={<Image source={Contatos_image} style={[styles.quickAccessIconImage, { tintColor: '#f25e75' }]} resizeMode="contain" />}
+              styles={styles}
+              icon={<Image source={Contatos_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
               label="Contatos SOS"
               onPress={() => router.push('/contatos')}
             />
 
             {/* 3. Alertas Recentes */}
             <QuickAccessCard
-              icon={<Image source={Alerta_image} style={[styles.quickAccessIconImage, { tintColor: '#f25e75' }]} resizeMode="contain" />}
+              styles={styles}
+              icon={<Image source={Alerta_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
               label="Alertas Recentes"
             />
 
             {/* 4. Áreas de Risco */}
             <QuickAccessCard
-              icon={<Image source={Areas_image} style={[styles.quickAccessIconImage, { tintColor: '#f25e75' }]} resizeMode="contain" />}
+              styles={styles}
+              icon={<Image source={Areas_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
               label="Áreas de risco"
               onPress={triggerDangerZoneAlert}
             />
@@ -140,17 +150,21 @@ const Home = () => {
           <View style={styles.recentSectionHeader}>
             <Text style={styles.sectionTitle}>Ocorrências Recentes</Text>
             <TouchableOpacity onPress={() => setModalVisible(true)}>
-              <Text style={{ color: '#F35F74', fontWeight: 'bold' }}>Ver todas ❯</Text>
+              <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Ver todas ❯</Text>
             </TouchableOpacity>
           </View>
 
           <View style={{ gap: 15 }}>
             <OccurrenceCard
+              styles={styles}
+              colors={colors}
               title="Roubo"
               description="pegaram meu celular na esquina"
               time="10 Abril, 10:59"
             />
             <OccurrenceCard
+              styles={styles}
+              colors={colors}
               title="Assédio"
               description="assoviaram para mim"
               time="15 Abril, 11:30"
@@ -161,23 +175,26 @@ const Home = () => {
 
       {/* Barra de Navegação Inferior */}
       <View style={styles.bottomNav}>
-        <NavItem active icon={<MaterialIcons name="home" size={28} color="#f25e75" />} label="Início" />
-        <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color="#9C97AC" />} label="Ocorrencias" onPress={() => router.push('/ocorrencias')} />
-        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color="#9C97AC" />} label="Contatos" onPress={() => router.push('/contatos')} />
+        <NavItem active icon={<MaterialIcons name="home" size={28} color={colors.primary} />} label="Início" styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color={colors.secondary} />} label="Ocorrencias" onPress={() => router.push('/ocorrencias')} styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color={colors.secondary} />} label="Contatos" onPress={() => router.push('/contatos')} styles={styles} />
         <NavItem 
-          icon={<MaterialCommunityIcons name="bell-outline" size={28} color="#9C97AC" />} 
+          icon={<MaterialCommunityIcons name="bell-outline" size={28} color={colors.secondary} />} 
           label="Alertas" 
           onPress={() => router.push('/alertas' as any)}
+          styles={styles}
         />
         <NavItem 
-          icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color="#9C97AC" />} 
+          icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color={colors.secondary} />} 
           label="Perfil" 
           onPress={() => router.push('/perfil')}
+          styles={styles}
         />
         <NavItem 
-          icon={<MaterialCommunityIcons name="cog-outline" size={28} color="#9C97AC" />} 
+          icon={<MaterialCommunityIcons name="cog-outline" size={28} color={colors.secondary} />} 
           label="Ajustes" 
           onPress={() => router.push('/settings')}
+          styles={styles}
         />
       </View>
 
@@ -196,7 +213,7 @@ const Home = () => {
                 style={styles.closeButton} 
                 onPress={() => setModalVisible(false)}
               >
-                <MaterialIcons name="close" size={28} color="#1A1A1A" />
+                <MaterialIcons name="close" size={28} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -204,7 +221,7 @@ const Home = () => {
               {mockOcorrencias.map((item) => (
                 <View key={item.id} style={styles.occurrenceCard}>
                   <View style={styles.occurrenceIconBox}>
-                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color="#f25e75" />
+                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.occurrenceTitle}>{item.title}</Text>
@@ -222,7 +239,7 @@ const Home = () => {
   );
 };
 
-const QuickAccessCard = ({ icon, label, onPress }: any) => (
+const QuickAccessCard = ({ icon, label, onPress, styles }: any) => (
   <TouchableOpacity style={styles.quickAccessCard} activeOpacity={0.7} onPress={onPress}>
     <View style={styles.quickAccessIconBox}>
       {icon}
@@ -231,23 +248,23 @@ const QuickAccessCard = ({ icon, label, onPress }: any) => (
   </TouchableOpacity>
 );
 
-const OccurrenceCard = ({ title, description, time }: any) => (
+const OccurrenceCard = ({ title, description, time, styles, colors }: any) => (
   <View style={styles.occurrenceCard}>
     <View style={styles.occurrenceIconBox}>
-      <MaterialCommunityIcons name="alert-circle" size={30} color="#f25e75" />
+      <MaterialCommunityIcons name="alert-circle" size={30} color={colors.primary} />
     </View>
     <View style={styles.occurrenceInfo}>
       <Text style={styles.occurrenceTitle}>{title}</Text>
       <Text style={styles.occurrenceDescription}>{description}</Text>
       <View style={styles.occurrenceTimeRow}>
-        <MaterialCommunityIcons name="clock-outline" size={12} color="#AAA" />
+        <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
         <Text style={styles.occurrenceTime}>{time}</Text>
       </View>
     </View>
   </View>
 );
 
-const NavItem = ({ active, icon, label, onPress }: any) => (
+const NavItem = ({ active, icon, label, onPress, styles }: any) => (
   <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={onPress}>
     <View style={active ? styles.navIconActive : undefined}>
       {icon}

@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useColorScheme as useDeviceColorScheme } from 'react-native';
+import React, { createContext, useContext, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -13,7 +12,6 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const deviceColorScheme = useDeviceColorScheme();
   const [theme, setThemeState] = useState<ThemeMode>('light');
 
   const toggleTheme = () => {

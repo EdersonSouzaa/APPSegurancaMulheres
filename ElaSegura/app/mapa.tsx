@@ -8,51 +8,51 @@ import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
 
 const BAIRROS = [
-  { name: 'Meireles',         risk: 'safe',   incidents: 0,  lat: -3.7247, lng: -38.5016 },
-  { name: 'Aldeota',          risk: 'safe',   incidents: 1,  lat: -3.7389, lng: -38.5024 },
-  { name: 'Cocó',             risk: 'safe',   incidents: 2,  lat: -3.7533, lng: -38.4824 },
-  { name: 'Centro',           risk: 'medium', incidents: 5,  lat: -3.7172, lng: -38.5431 },
-  { name: 'Papicu',           risk: 'medium', incidents: 3,  lat: -3.7400, lng: -38.4900 },
-  { name: 'Bairro de Fátima', risk: 'safe',   incidents: 0,  lat: -3.7450, lng: -38.5250 },
-  { name: 'Pirambu',          risk: 'danger', incidents: 8,  lat: -3.7021, lng: -38.5621 },
-  { name: 'Damas',            risk: 'medium', incidents: 4,  lat: -3.7606, lng: -38.5386 },
-  { name: 'Siqueira',         risk: 'danger', incidents: 6,  lat: -3.7986, lng: -38.5997 },
-  { name: 'Bom Jardim',       risk: 'danger', incidents: 9,  lat: -3.8211, lng: -38.5858 },
-  { name: 'Messejana',        risk: 'medium', incidents: 2,  lat: -3.8178, lng: -38.4960 },
-  { name: 'Edson Queiroz',    risk: 'safe',   incidents: 0,  lat: -3.7935, lng: -38.4735 },
+  { name: 'Meireles', risk: 'safe', incidents: 0, lat: -3.7247, lng: -38.5016 },
+  { name: 'Aldeota', risk: 'safe', incidents: 1, lat: -3.7389, lng: -38.5024 },
+  { name: 'Cocó', risk: 'safe', incidents: 2, lat: -3.7533, lng: -38.4824 },
+  { name: 'Centro', risk: 'medium', incidents: 5, lat: -3.7172, lng: -38.5431 },
+  { name: 'Papicu', risk: 'medium', incidents: 3, lat: -3.7400, lng: -38.4900 },
+  { name: 'Bairro de Fátima', risk: 'safe', incidents: 0, lat: -3.7450, lng: -38.5250 },
+  { name: 'Pirambu', risk: 'danger', incidents: 8, lat: -3.7021, lng: -38.5621 },
+  { name: 'Damas', risk: 'medium', incidents: 4, lat: -3.7606, lng: -38.5386 },
+  { name: 'Siqueira', risk: 'danger', incidents: 6, lat: -3.7986, lng: -38.5997 },
+  { name: 'Bom Jardim', risk: 'danger', incidents: 9, lat: -3.8211, lng: -38.5858 },
+  { name: 'Messejana', risk: 'medium', incidents: 2, lat: -3.8178, lng: -38.4960 },
+  { name: 'Edson Queiroz', risk: 'safe', incidents: 0, lat: -3.7935, lng: -38.4735 },
 ];
 
 const OCORRENCIAS = [
-  { id: 1, tipo: 'Assédio verbal',     bairro: 'Centro',      hora: 'há 20 min',  risco: 'medium' },
-  { id: 2, tipo: 'Perseguição',         bairro: 'Pirambu',     hora: 'há 45 min',  risco: 'danger' },
-  { id: 3, tipo: 'Iluminação ruim',    bairro: 'Bom Jardim',  hora: 'há 1h',      risco: 'danger' },
-  { id: 4, tipo: 'Sensação de perigo', bairro: 'Papicu',      hora: 'há 2h',      risco: 'medium' },
-  { id: 5, tipo: 'Assédio físico',     bairro: 'Siqueira',    hora: 'há 3h',      risco: 'danger' },
-  { id: 6, tipo: 'Assédio verbal',     bairro: 'Damas',       hora: 'há 4h',      risco: 'medium' },
-  { id: 7, tipo: 'Perseguição',         bairro: 'Pirambu',     hora: 'há 5h',      risco: 'danger' },
-  { id: 8, tipo: 'Iluminação ruim',    bairro: 'Centro',      hora: 'há 6h',      risco: 'medium' },
+  { id: 1, tipo: 'Assédio verbal', bairro: 'Centro', hora: 'há 20 min', risco: 'medium' },
+  { id: 2, tipo: 'Perseguição', bairro: 'Pirambu', hora: 'há 45 min', risco: 'danger' },
+  { id: 3, tipo: 'Iluminação ruim', bairro: 'Bom Jardim', hora: 'há 1h', risco: 'danger' },
+  { id: 4, tipo: 'Sensação de perigo', bairro: 'Papicu', hora: 'há 2h', risco: 'medium' },
+  { id: 5, tipo: 'Assédio físico', bairro: 'Siqueira', hora: 'há 3h', risco: 'danger' },
+  { id: 6, tipo: 'Assédio verbal', bairro: 'Damas', hora: 'há 4h', risco: 'medium' },
+  { id: 7, tipo: 'Perseguição', bairro: 'Pirambu', hora: 'há 5h', risco: 'danger' },
+  { id: 8, tipo: 'Iluminação ruim', bairro: 'Centro', hora: 'há 6h', risco: 'medium' },
 ];
 
 const RISK_CONFIG = {
-  safe:   { bg: '#E8F5E9', border: '#A5D6A7', text: '#2E7D32', label: 'Seguro',  icon: 'checkmark-circle' as const,  iconColor: '#43A047' },
-  medium: { bg: '#FFF8E1', border: '#FFD54F', text: '#E65100', label: 'Atenção', icon: 'warning'          as const,  iconColor: '#FF8F00' },
-  danger: { bg: '#FFEBEE', border: '#EF9A9A', text: '#B71C1C', label: 'Perigo',  icon: 'alert-circle'     as const,  iconColor: '#E53935' },
+  safe: { bg: '#E8F5E9', border: '#A5D6A7', text: '#2E7D32', label: 'Seguro', icon: 'checkmark-circle' as const, iconColor: '#43A047' },
+  medium: { bg: '#FFF8E1', border: '#FFD54F', text: '#E65100', label: 'Atenção', icon: 'warning' as const, iconColor: '#FF8F00' },
+  danger: { bg: '#FFEBEE', border: '#EF9A9A', text: '#B71C1C', label: 'Perigo', icon: 'alert-circle' as const, iconColor: '#E53935' },
 };
 
 const FILTERS = ['Todos', 'Assédio verbal', 'Assédio físico', 'Perseguição', 'Iluminação ruim', 'Sensação de perigo'];
 
 const TIPO_ICON: Record<string, { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }> = {
-  'Assédio verbal':     { icon: 'megaphone-outline',   color: '#FB8C00' },
-  'Assédio físico':     { icon: 'hand-left-outline',   color: '#E53935' },
-  'Perseguição':        { icon: 'walk-outline',         color: '#8E24AA' },
-  'Iluminação ruim':    { icon: 'bulb-outline',         color: '#3949AB' },
-  'Sensação de perigo': { icon: 'alert-outline',        color: '#F06292' },
+  'Assédio verbal': { icon: 'megaphone-outline', color: '#FB8C00' },
+  'Assédio físico': { icon: 'hand-left-outline', color: '#E53935' },
+  'Perseguição': { icon: 'walk-outline', color: '#8E24AA' },
+  'Iluminação ruim': { icon: 'bulb-outline', color: '#3949AB' },
+  'Sensação de perigo': { icon: 'alert-outline', color: '#F06292' },
 };
 
 export default function MapaScreen() {
-  const [filter,      setFilter]      = useState('Todos');
-  const [selectedB,   setSelectedB]   = useState<string | null>(null);
-  const [activeTab,   setActiveTab]   = useState<'bairros' | 'ocorrencias'>('ocorrencias');
+  const [filter, setFilter] = useState('Todos');
+  const [selectedB, setSelectedB] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'bairros' | 'ocorrencias'>('ocorrencias');
 
   const totalOcorrencias = BAIRROS.reduce((a, b) => a + b.incidents, 0);
 
@@ -105,9 +105,9 @@ export default function MapaScreen() {
 
       <View style={s.statsRow}>
         {[
-          { label: 'Seguro',  count: BAIRROS.filter(b => b.risk === 'safe').length,   color: '#43A047' },
+          { label: 'Seguro', count: BAIRROS.filter(b => b.risk === 'safe').length, color: '#43A047' },
           { label: 'Atenção', count: BAIRROS.filter(b => b.risk === 'medium').length, color: '#FF8F00' },
-          { label: 'Perigo',  count: BAIRROS.filter(b => b.risk === 'danger').length, color: '#E53935' },
+          { label: 'Perigo', count: BAIRROS.filter(b => b.risk === 'danger').length, color: '#E53935' },
         ].map(st => (
           <View key={st.label} style={s.statCard}>
             <Text style={[s.statNum, { color: st.color }]}>{st.count}</Text>
@@ -242,81 +242,81 @@ export default function MapaScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: '#F7D2F1' },
+  safe: { flex: 1, backgroundColor: '#F7D2F1' },
 
-  header:           { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 15 : 10, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 5 },
-  backBtn:          { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: -4 },
-  headerTitle:      { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
-  headerSub:        { fontSize: 13, color: '#6A6A75', marginTop: 2 },
-  headerBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF0F2', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20 },
-  headerBadgeText:  { fontSize: 12, fontWeight: '700', color: Colors.pinkBtn },
+  header: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 15 : 10, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 5 },
+  backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: -4 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
+  headerSub: { fontSize: 13, color: '#6A6A75', marginTop: 2 },
+  headerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF0F2', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20 },
+  headerBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.pinkBtn },
 
-  mapCard:          { margin: 16, height: 180, borderRadius: 24, overflow: 'hidden', backgroundColor: '#fff', elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8 },
-  mapImage:         { width: '100%', height: '100%' },
-  mapOverlay:       { position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center' },
-  mapYouPin:        { alignItems: 'center' },
-  mapYouDot:        { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.pinkBtn, borderWidth: 3, borderColor: '#fff', elevation: 4 },
-  mapYouLabel:      { fontSize: 10, fontWeight: '700', color: Colors.pinkD, backgroundColor: '#fff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4, overflow: 'hidden' },
-  mapBadgeRow:      { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', gap: 6 },
-  mapBadge:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1 },
-  mapBadgeDot:      { width: 7, height: 7, borderRadius: 3.5 },
-  mapBadgeText:     { fontSize: 10, fontWeight: '700' },
+  mapCard: { margin: 16, height: 180, borderRadius: 24, overflow: 'hidden', backgroundColor: '#fff', elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8 },
+  mapImage: { width: '100%', height: '100%' },
+  mapOverlay: { position: 'absolute', inset: 0, justifyContent: 'center', alignItems: 'center' },
+  mapYouPin: { alignItems: 'center' },
+  mapYouDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.pinkBtn, borderWidth: 3, borderColor: '#fff', elevation: 4 },
+  mapYouLabel: { fontSize: 10, fontWeight: '700', color: Colors.pinkD, backgroundColor: '#fff', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4, overflow: 'hidden' },
+  mapBadgeRow: { position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', gap: 6 },
+  mapBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1 },
+  mapBadgeDot: { width: 7, height: 7, borderRadius: 3.5 },
+  mapBadgeText: { fontSize: 10, fontWeight: '700' },
 
-  statsRow:         { flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 4 },
-  statCard:         { flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
-  statNum:          { fontSize: 22, fontWeight: '700' },
-  statLabel:        { fontSize: 11, color: '#999', marginTop: 2, fontWeight: '500' },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 10, marginBottom: 4 },
+  statCard: { flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
+  statNum: { fontSize: 22, fontWeight: '700' },
+  statLabel: { fontSize: 11, color: '#999', marginTop: 2, fontWeight: '500' },
 
   filtersContainer: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0e0e8', height: 75 },
-  filtersContent:   { paddingHorizontal: 12, gap: 10, flexDirection: 'row', alignItems: 'center', height: '100%' },
-  chip:             { height: 44, paddingHorizontal: 20, borderRadius: 22, borderWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#f9f9f9', justifyContent: 'center', alignItems: 'center' },
-  chipActive:       { backgroundColor: Colors.pinkM, borderColor: Colors.pinkBtn },
-  chipText:         { fontSize: 14, color: '#666', fontWeight: '500' },
-  chipTextActive:   { color: Colors.pinkD, fontWeight: '700' },
+  filtersContent: { paddingHorizontal: 12, gap: 10, flexDirection: 'row', alignItems: 'center', height: '100%' },
+  chip: { height: 44, paddingHorizontal: 20, borderRadius: 22, borderWidth: 1, borderColor: '#f0f0f0', backgroundColor: '#f9f9f9', justifyContent: 'center', alignItems: 'center' },
+  chipActive: { backgroundColor: Colors.pinkM, borderColor: Colors.pinkBtn },
+  chipText: { fontSize: 14, color: '#666', fontWeight: '500' },
+  chipTextActive: { color: Colors.pinkD, fontWeight: '700' },
 
-  tabRow:           { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 8, gap: 4, borderBottomWidth: 0.5, borderBottomColor: '#f0e0e8' },
-  tab:              { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingBottom: 10, gap: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive:        { borderBottomColor: Colors.pinkBtn },
-  tabText:          { fontSize: 13, color: '#666', fontWeight: '500' },
-  tabTextActive:    { color: Colors.pinkBtn, fontWeight: '700' },
-  tabBadge:         { backgroundColor: Colors.pinkM, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  tabBadgeText:     { fontSize: 10, color: Colors.pinkD, fontWeight: '700' },
+  tabRow: { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 8, gap: 4, borderBottomWidth: 0.5, borderBottomColor: '#f0e0e8' },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingBottom: 10, gap: 6, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabActive: { borderBottomColor: Colors.pinkBtn },
+  tabText: { fontSize: 13, color: '#666', fontWeight: '500' },
+  tabTextActive: { color: Colors.pinkBtn, fontWeight: '700' },
+  tabBadge: { backgroundColor: Colors.pinkM, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
+  tabBadgeText: { fontSize: 10, color: Colors.pinkD, fontWeight: '700' },
 
-  scroll:           { padding: 14, paddingBottom: 32, gap: 12 },
+  scroll: { padding: 14, paddingBottom: 32, gap: 12 },
 
-  grid:             { gap: 10 },
-  bCard:            { width: '100%', backgroundColor: '#fff', borderRadius: 16, padding: 12, gap: 8, borderWidth: 1, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
-  bCardTop:         { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  bRiskDot:         { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  bName:            { fontSize: 12, fontWeight: '700', color: '#1A1A1A', flex: 1 },
-  bBadge:           { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  bBadgeText:       { fontSize: 10, color: '#fff', fontWeight: '700' },
-  bRiskTag:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 8, alignSelf: 'flex-start' },
-  bRiskLabel:       { fontSize: 10, fontWeight: '600' },
-  bDetail:          { fontSize: 11, marginTop: 2 },
+  grid: { gap: 10 },
+  bCard: { width: '100%', backgroundColor: '#fff', borderRadius: 16, padding: 12, gap: 8, borderWidth: 1, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
+  bCardTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bRiskDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  bName: { fontSize: 12, fontWeight: '700', color: '#1A1A1A', flex: 1 },
+  bBadge: { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
+  bBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  bRiskTag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 8, alignSelf: 'flex-start' },
+  bRiskLabel: { fontSize: 10, fontWeight: '600' },
+  bDetail: { fontSize: 11, marginTop: 2 },
 
-  oList:            { gap: 10 },
-  oCard:            { backgroundColor: '#fff', borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
-  oIconBox:         { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  oInfo:            { flex: 1 },
-  oTipo:            { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
-  oMetaRow:         { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
-  oMeta:            { fontSize: 11, color: '#999' },
-  oRiskTag:         { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
-  oRiskText:        { fontSize: 10, fontWeight: '700' },
+  oList: { gap: 10 },
+  oCard: { backgroundColor: '#fff', borderRadius: 20, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
+  oIconBox: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  oInfo: { flex: 1 },
+  oTipo: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+  oMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  oMeta: { fontSize: 11, color: '#999' },
+  oRiskTag: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  oRiskText: { fontSize: 10, fontWeight: '700' },
 
-  emptyState:       { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  emptyText:        { fontSize: 14, color: '#bbb', fontWeight: '500' },
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  emptyText: { fontSize: 14, color: '#bbb', fontWeight: '500' },
 
-  yourLocation:     { backgroundColor: '#fff', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
+  yourLocation: { backgroundColor: '#fff', borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4 },
   yourLocationLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   yourLocationText: { fontSize: 13, color: '#555', flex: 1 },
   yourLocationBold: { fontWeight: '700', color: Colors.pinkD },
-  locationDot:      { width: 10, height: 10, borderRadius: 5 },
+  locationDot: { width: 10, height: 10, borderRadius: 5 },
 
-  reportBtn:        { backgroundColor: Colors.pinkBtn, borderRadius: 20, padding: 16, elevation: 4, shadowColor: '#F06292', shadowOpacity: 0.35, shadowRadius: 8 },
-  reportBtnInner:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  reportBtnText:    { fontSize: 15, fontWeight: '700', color: '#fff' },
+  reportBtn: { backgroundColor: Colors.pinkBtn, borderRadius: 20, padding: 16, elevation: 4, shadowColor: '#F06292', shadowOpacity: 0.35, shadowRadius: 8 },
+  reportBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  reportBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
-  updateText:       { textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 4 },
+  updateText: { textAlign: 'center', fontSize: 11, color: '#bbb', paddingBottom: 4 },
 });

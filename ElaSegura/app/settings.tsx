@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function Settings() {
   const router = useRouter();
@@ -189,7 +189,7 @@ export default function Settings() {
           <SettingItem 
             icon="information-outline" 
             title="Sobre o App" 
-            onPress={() => router.push('/about')} 
+            onPress={() => router.push('/about' as any)} 
             isLast
           />
         </Section>

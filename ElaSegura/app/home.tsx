@@ -124,6 +124,7 @@ const Home = () => {
               styles={styles}
               icon={<Image source={Alerta_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
               label="Alertas Recentes"
+              onPress={() => router.push('/alertas' as any)}
             />
 
             {/* 4. Áreas de Risco */}

@@ -6,9 +6,27 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     backgroundColor: colors.background, 
   },
   header: {
-    alignItems: 'center',
+    paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 50 : 40,
     paddingBottom: 20,
+    alignItems: 'center', // Center everything (title and avatar)
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: Platform.OS === 'android' ? 45 : 35,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: colors.cardBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 10,
   },
   headerTitle: {
     fontSize: 20,

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getStyles } from '../styles/alertas.styles';
 import { useTheme } from '../context/ThemeContext';
@@ -20,7 +20,7 @@ const AlertasScreen = () => {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <MaterialCommunityIcons name="arrow-left" size={28} color={colors.text} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.title}>Alertas</Text>
         </View>

@@ -25,10 +25,10 @@ export default function Perfil() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity 
-            style={{ position: 'absolute', left: 20, top: 40, zIndex: 1 }} 
+            style={styles.backButton} 
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={28} color={colors.text} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Meu Perfil</Text>
           

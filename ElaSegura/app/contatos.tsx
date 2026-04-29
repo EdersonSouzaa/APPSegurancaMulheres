@@ -16,18 +16,15 @@ export default function Contatos() {
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
 
       {/* Cabeçalho */}
-     <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
-        <TouchableOpacity 
-          style={{ marginRight: 15 }} 
-          onPress={() => router.back()}
-        >
-          <MaterialIcons name="arrow-back" size={28} color={colors.text} />
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <MaterialIcons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View>
-            <Text style={styles.headerTitle}>Contatos de Confiança</Text>
-            <Text style={styles.headerSubtitle}>Escolha contatos de confiança 💜</Text>
+          <Text style={styles.headerTitle}>Contatos de Confiança</Text>
+          <Text style={styles.headerSubtitle}>Escolha contatos de confiança 💜</Text>
         </View>
-     </View>   
+      </View>   
       {/* Botão Adicionar */}
       <TouchableOpacity style={styles.addButton} activeOpacity={0.8}>
         <Text style={styles.addButtonText}>+ Adicionar contatos</Text>

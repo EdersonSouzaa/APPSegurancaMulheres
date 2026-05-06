@@ -7,8 +7,10 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 50 : 40,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 20,
+  },
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -26,48 +28,48 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     shadowRadius: 4,
     marginRight: 15,
   },
-  headerTitle: {
-    fontSize: 22,
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
   },
-  headerSubtitle: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 16,
     color: colors.secondary,
     marginTop: 5,
   },
-  addButton: {
-    backgroundColor: colors.primary,
-    marginHorizontal: 20,
-    borderRadius: 20,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-    elevation: 3,
-  },
-  addButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   emptyStateContainer: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    marginTop: -50,
+  },
+  emptyStateIconBox: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingBottom: 50, // Dá um respiro para não ficar colado no fundo
+    marginBottom: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   emptyStateTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-    marginTop: 15,
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  emptyStateText: {
-    fontSize: 14,
+  emptyStateDescription: {
+    fontSize: 15,
     color: colors.secondary,
     textAlign: 'center',
-    marginTop: 10,
+    lineHeight: 22,
   },
 });

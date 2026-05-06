@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,21 +8,52 @@ import {
   StatusBar,
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { styles } from '../styles/perfil.styles';
+import { getStyles } from '../styles/perfil.styles';
 import { router } from 'expo-router';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect } from 'react';
 
 export default function Perfil() {
+  const { isDarkMode, theme } = useTheme();
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+
+  const [userData, setUserData] = useState({ name: '', email: '' });
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const savedUser = await AsyncStorage.getItem('user');
+        const savedPassword = await AsyncStorage.getItem('userPassword');
+        
+        if (savedUser) {
+          setUserData(JSON.parse(savedUser));
+        }
+        if (savedPassword) {
+          setPassword(savedPassword);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error);
+      }
+    };
+
+    loadUserData();
+  }, []);
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity 
-            style={{ position: 'absolute', left: 20, top: 40, zIndex: 1 }} 
+            style={styles.backButton} 
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={28} color="#1A1A1A" />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Meu Perfil</Text>
           
@@ -30,8 +61,8 @@ export default function Perfil() {
             <View style={styles.avatarBox}>
               <MaterialIcons name="person" size={50} color="#FFF" />
             </View>
-            <Text style={styles.userName}>Nome</Text>
-            <Text style={styles.userEmail}>seu@email.com</Text>
+            <Text style={styles.userName}>{userData.name || 'Usuária'}</Text>
+            <Text style={styles.userEmail}>{userData.email || 'carregando...'}</Text>
           </View>
         </View>
 
@@ -39,31 +70,37 @@ export default function Perfil() {
           <Text style={styles.sectionTitle}>Informações de perfil</Text>
           
           <View style={styles.inputGroup}>
+            <Text style={styles.label}>Nome</Text>
+            <TextInput 
+              style={styles.input}
+              placeholder="Seu Nome"
+              placeholderTextColor={colors.secondary}
+              value={userData.name}
+              onChangeText={(text) => setUserData({...userData, name: text})}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
             <TextInput 
               style={styles.input}
               placeholder="seu@email.com"
-              placeholderTextColor="#9C97AC"
+              placeholderTextColor={colors.secondary}
               keyboardType="email-address"
+              value={userData.email}
+              onChangeText={(text) => setUserData({...userData, email: text})}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Telefone</Text>
+            <Text style={styles.label}>Senha</Text>
             <TextInput 
               style={styles.input}
-              placeholder="85999999999"
-              placeholderTextColor="#9C97AC"
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Endereço</Text>
-            <TextInput 
-              style={styles.input}
-              placeholder="Seu Endereço"
-              placeholderTextColor="#9C97AC"
+              placeholder="********"
+              placeholderTextColor={colors.secondary}
+              secureTextEntry={true}
+              value={password}
+              onChangeText={setPassword}
             />
           </View>
 
@@ -72,7 +109,7 @@ export default function Perfil() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.logoutButton} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="logout" size={20} color="#F35F74" />
+            <MaterialCommunityIcons name="logout" size={20} color={colors.primary} />
             <Text style={styles.logoutText}>Sair da conta</Text>
           </TouchableOpacity>
         </View>

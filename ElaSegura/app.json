@@ -4,7 +4,7 @@
     "slug": "ElaSegura",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/alerta.png",
     "scheme": "elasegura",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -22,8 +22,8 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/alerta.png"
     },
     "plugins": [
       "expo-router",

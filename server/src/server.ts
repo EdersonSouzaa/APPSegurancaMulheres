@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import ocorrenciaRoutes from './routes/ocorrencias.js';
 import contatoRoutes from './routes/contatos.js';
 import sosRoutes from './routes/sos.js';
+import userRoutes from './routes/user.js';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use('/auth', authRoutes);
 app.use('/ocorrencias', ocorrenciaRoutes);
 app.use('/contatos', contatoRoutes);
 app.use('/sos', sosRoutes);
+app.use('/user', userRoutes);
 
 // Health check
 app.get('/', (req, res) => {

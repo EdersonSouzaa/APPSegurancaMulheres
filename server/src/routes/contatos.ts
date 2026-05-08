@@ -33,4 +33,49 @@ router.get('/', authenticateToken, async (req: any, res: Response) => {
   }
 });
 
+// Update Contato
+router.put('/:id', authenticateToken, async (req: any, res: Response) => {
+  const { id } = req.params;
+  const { name, phone } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const result = await query(
+      'UPDATE "contatos" SET name = $1, phone = $2 WHERE id = $3 AND user_id = $4 RETURNING *',
+      [name, phone, id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Contato not found or unauthorized' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating contato:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete Contato
+router.delete('/:id', authenticateToken, async (req: any, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const result = await query(
+      'DELETE FROM "contatos" WHERE id = $1 AND user_id = $2 RETURNING *',
+      [id, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Contato not found or unauthorized' });
+    }
+
+    res.json({ message: 'Contato deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting contato:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

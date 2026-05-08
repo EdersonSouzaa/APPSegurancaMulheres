@@ -51,6 +51,7 @@ export default function Login() {
       
       // Salva os dados do usuário para serem usados no perfil
       await AsyncStorage.setItem('user', JSON.stringify(response.user));
+      await AsyncStorage.setItem('userToken', response.token);
       await AsyncStorage.setItem('userPassword', password); // Salvando a senha localmente para exibir no perfil conforme pedido
       
       console.log('Login realizado:', response);

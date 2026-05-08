@@ -39,5 +39,40 @@ export const api = {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Erro na requisição');
     return result;
+  },
+
+  async put(endpoint: string, data: any, token?: string) {
+    const headers: any = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Erro na requisição');
+    return result;
+  },
+
+  async delete(endpoint: string, token?: string) {
+    const headers: any = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers,
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Erro na requisição');
+    return result;
   }
 };

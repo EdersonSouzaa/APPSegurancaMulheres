@@ -56,7 +56,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 30,
-    paddingBottom: 50, // Dá um respiro para não ficar colado no fundo
+    paddingBottom: 50,
   },
   emptyStateTitle: {
     fontSize: 18,
@@ -69,5 +69,101 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     color: colors.secondary,
     textAlign: 'center',
     marginTop: 10,
+  },
+  list: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  contactItem: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 20,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  contactInfo: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: colors.secondary,
+    marginTop: 2,
+  },
+  contactActions: {
+    flexDirection: 'row',
+  },
+  actionButton: {
+    padding: 8,
+    marginLeft: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: 30,
+    padding: 25,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    backgroundColor: isDarkMode ? '#252525' : '#F5F5F5',
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    height: 50,
+    marginBottom: 15,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  modalButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: isDarkMode ? '#333' : '#E0E0E0',
+  },
+  saveButton: {
+    backgroundColor: colors.primary,
+  },
+  buttonText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  saveButtonText: {
+    color: '#FFF',
+  },
+  cancelButtonText: {
+    color: isDarkMode ? '#FFF' : '#333',
   },
 });

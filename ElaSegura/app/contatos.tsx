@@ -1,15 +1,137 @@
-import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StatusBar, 
+  FlatList, 
+  Modal, 
+  TextInput, 
+  Alert, 
+  ActivityIndicator 
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/contatos.styles';
 import { router } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
+import { api } from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface Contato {
+  id: number;
+  name: string;
+  phone: string;
+}
 
 export default function Contatos() {
   const { isDarkMode, theme } = useTheme();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+
+  const [contatos, setContatos] = useState<Contato[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingContato, setEditingContato] = useState<Contato | null>(null);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  useEffect(() => {
+    fetchContatos();
+  }, []);
+
+  const fetchContatos = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+      const data = await api.get('/contatos', token);
+      setContatos(data);
+    } catch (error: any) {
+      console.error('Error fetching contatos:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os contatos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name || !phone) {
+      Alert.alert('Aviso', 'Preencha todos os campos.');
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (editingContato) {
+        await api.put(`/contatos/${editingContato.id}`, { name, phone }, token || undefined);
+      } else {
+        await api.post('/contatos', { name, phone }, token || undefined);
+      }
+      
+      setModalVisible(false);
+      resetForm();
+      fetchContatos();
+    } catch (error: any) {
+      Alert.alert('Erro', 'Ocorreu um erro ao salvar o contato.');
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    Alert.alert(
+      'Confirmar',
+      'Deseja realmente excluir este contato?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Excluir', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('userToken');
+              await api.delete(`/contatos/${id}`, token || undefined);
+              fetchContatos();
+            } catch (error: any) {
+              Alert.alert('Erro', 'Erro ao excluir contato.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const openEditModal = (contato: Contato) => {
+    setEditingContato(contato);
+    setName(contato.name);
+    setPhone(contato.phone);
+    setModalVisible(true);
+  };
+
+  const resetForm = () => {
+    setEditingContato(null);
+    setName('');
+    setPhone('');
+  };
+
+  const renderContato = ({ item }: { item: Contato }) => (
+    <View style={styles.contactItem}>
+      <MaterialIcons name="person" size={40} color={colors.primary} />
+      <View style={styles.contactInfo}>
+        <Text style={styles.contactName}>{item.name}</Text>
+        <Text style={styles.contactPhone}>{item.phone}</Text>
+      </View>
+      <View style={styles.contactActions}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
+          <MaterialIcons name="edit" size={24} color={colors.secondary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleDelete(item.id)}>
+          <MaterialIcons name="delete" size={24} color="#FF5252" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -25,19 +147,87 @@ export default function Contatos() {
           <Text style={styles.headerSubtitle}>Escolha contatos de confiança 💜</Text>
         </View>
       </View>   
+
       {/* Botão Adicionar */}
-      <TouchableOpacity style={styles.addButton} activeOpacity={0.8}>
-        <Text style={styles.addButtonText}>+ Adicionar contatos</Text>
+      <TouchableOpacity 
+        style={styles.addButton} 
+        activeOpacity={0.8}
+        onPress={() => {
+          resetForm();
+          setModalVisible(true);
+        }}
+      >
+        <Text style={styles.addButtonText}>+ Adicionar contato</Text>
       </TouchableOpacity>
 
-      {/* Estado Vazio (Nenhum contato) */}
-      <View style={styles.emptyStateContainer}>
-        <MaterialIcons name="account-circle" size={100} color={isDarkMode ? colors.secondary : "#1A1A1A"} />
-        <Text style={styles.emptyStateTitle}>Nenhum contato adicionado</Text>
-        <Text style={styles.emptyStateText}>
-          Adicione contatos de confiança para enviar alertas
-        </Text>
-      </View>
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
+      ) : contatos.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <MaterialIcons name="account-circle" size={100} color={isDarkMode ? colors.secondary : "#1A1A1A"} />
+          <Text style={styles.emptyStateTitle}>Nenhum contato adicionado</Text>
+          <Text style={styles.emptyStateText}>
+            Adicione contatos de confiança para enviar alertas
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={contatos}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderContato}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Modal de Adicionar/Editar */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {editingContato ? 'Editar Contato' : 'Novo Contato'}
+            </Text>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Nome do contato"
+              placeholderTextColor={colors.secondary}
+              value={name}
+              onChangeText={setName}
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Telefone"
+              placeholderTextColor={colors.secondary}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSave}
+              >
+                <Text style={[styles.buttonText, styles.saveButtonText]}>Salvar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

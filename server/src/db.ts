@@ -45,6 +45,17 @@ export const initDb = async () => {
       );
     `);
 
+    // Add type + coordinate columns if they don't exist (migration for existing DBs)
+    await client.query(`
+      ALTER TABLE "ocorrencia" ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'error';
+    `);
+    await client.query(`
+      ALTER TABLE "ocorrencia" ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+    `);
+    await client.query(`
+      ALTER TABLE "ocorrencia" ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+    `);
+
     // Create Contatos table
     await client.query(`
       CREATE TABLE IF NOT EXISTS "contatos" (

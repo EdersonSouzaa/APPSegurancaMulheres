@@ -3,7 +3,8 @@ import Constants from 'expo-constants';
 // Em desenvolvimento, o localhost funciona no navegador, 
 // mas no celular físico/emulador você precisa do IP da máquina.
 // O endereço abaixo é o IP detectado na sua máquina.
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.1.108:3000';
+import { Platform } from 'react-native';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? 'http://localhost:3000' : 'http://10.0.1.108:3000');
 
 export const api = {
   async post(endpoint: string, data: any, token?: string) {

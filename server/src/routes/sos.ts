@@ -14,7 +14,17 @@ router.post('/', authenticateToken, async (req: any, res: Response) => {
       'INSERT INTO "SOS" (user_id, location) VALUES ($1, $2) RETURNING *',
       [userId, location]
     );
-    res.status(201).json({ message: 'SOS triggered successfully', data: result.rows[0] });
+
+    const contatos = await query(
+      'SELECT * FROM "contatos" WHERE user_id = $1 AND emergencial = true LIMIT 3',
+      [userId]
+    );
+
+    res.status(201).json({
+      message: 'SOS acionado com sucesso',
+      data: result.rows[0],
+      contatosEmergencia: contatos.rows
+    });
   } catch (error) {
     console.error('Error triggering SOS:', error);
     res.status(500).json({ error: 'Internal server error' });

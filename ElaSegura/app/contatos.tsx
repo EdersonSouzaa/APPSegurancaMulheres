@@ -8,7 +8,9 @@ import {
   Modal, 
   TextInput, 
   Alert, 
-  ActivityIndicator 
+  ActivityIndicator,
+  Switch,
+  ScrollView
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/contatos.styles';
@@ -22,6 +24,7 @@ interface Contato {
   id: number;
   name: string;
   phone: string;
+  emergencial: boolean;
 }
 
 export default function Contatos() {
@@ -35,6 +38,10 @@ export default function Contatos() {
   const [editingContato, setEditingContato] = useState<Contato | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [emergencial, setEmergencial] = useState(false);
+
+  const contatosEmergenciais = contatos.filter(c => c.emergencial);
+  const contatosNormais = contatos.filter(c => !c.emergencial);
 
   useEffect(() => {
     fetchContatos();
@@ -62,15 +69,13 @@ export default function Contatos() {
       Alert.alert('Aviso', 'Preencha todos os campos.');
       return;
     }
-
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (editingContato) {
-        await api.put(`/contatos/${editingContato.id}`, { name, phone }, token || undefined);
+        await api.put(`/contatos/${editingContato.id}`, { name, phone, emergencial }, token || undefined);
       } else {
-        await api.post('/contatos', { name, phone }, token || undefined);
+        await api.post('/contatos', { name, phone, emergencial }, token || undefined);
       }
-      
       setModalVisible(false);
       resetForm();
       fetchContatos();
@@ -106,6 +111,7 @@ export default function Contatos() {
     setEditingContato(contato);
     setName(contato.name);
     setPhone(contato.phone);
+    setEmergencial(contato.emergencial);
     setModalVisible(true);
   };
 
@@ -113,11 +119,12 @@ export default function Contatos() {
     setEditingContato(null);
     setName('');
     setPhone('');
+    setEmergencial(false);
   };
 
   const renderContato = ({ item }: { item: Contato }) => (
     <View style={styles.contactItem}>
-      <MaterialIcons name="person" size={40} color={colors.primary} />
+      <MaterialIcons name="person" size={40} color={item.emergencial ? '#FF5252' : colors.primary} />
       <View style={styles.contactInfo}>
         <Text style={styles.contactName}>{item.name}</Text>
         <Text style={styles.contactPhone}>{item.phone}</Text>
@@ -146,7 +153,7 @@ export default function Contatos() {
           <Text style={styles.headerTitle}>Contatos de Confiança</Text>
           <Text style={styles.headerSubtitle}>Escolha contatos de confiança 💜</Text>
         </View>
-      </View>   
+      </View>
 
       {/* Botão Adicionar */}
       <TouchableOpacity 
@@ -166,21 +173,51 @@ export default function Contatos() {
         <View style={styles.emptyStateContainer}>
           <MaterialIcons name="account-circle" size={100} color={isDarkMode ? colors.secondary : "#1A1A1A"} />
           <Text style={styles.emptyStateTitle}>Nenhum contato adicionado</Text>
-          <Text style={styles.emptyStateText}>
-            Adicione contatos de confiança para enviar alertas
-          </Text>
+          <Text style={styles.emptyStateText}>Adicione contatos de confiança para enviar alertas</Text>
         </View>
       ) : (
-        <FlatList
-          data={contatos}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderContato}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          
+          {/* Seção Emergenciais */}
+          {contatosEmergenciais.length > 0 && (
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 8 }}>
+                <MaterialIcons name="warning" size={18} color="#FF5252" />
+                <Text style={{ color: '#FF5252', fontWeight: 'bold', marginLeft: 6, fontSize: 14 }}>
+                  Contatos Emergenciais
+                </Text>
+              </View>
+              {contatosEmergenciais.map(item => (
+                <View key={item.id}>
+                  {renderContato({ item })}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Seção Contatos Normais */}
+          {contatosNormais.length > 0 && (
+            <View>
+              {contatosEmergenciais.length > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 16 }}>
+                  <MaterialIcons name="people" size={18} color={colors.secondary} />
+                  <Text style={{ color: colors.secondary, fontWeight: 'bold', marginLeft: 6, fontSize: 14 }}>
+                    Outros Contatos
+                  </Text>
+                </View>
+              )}
+              {contatosNormais.map(item => (
+                <View key={item.id}>
+                  {renderContato({ item })}
+                </View>
+              ))}
+            </View>
+          )}
+
+        </ScrollView>
       )}
 
-      {/* Modal de Adicionar/Editar */}
+      {/* Modal */}
       <Modal
         visible={modalVisible}
         transparent={true}
@@ -209,6 +246,16 @@ export default function Contatos() {
               onChangeText={setPhone}
               keyboardType="phone-pad"
             />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <Text style={{ color: colors.text, fontSize: 15 }}>Contato emergencial</Text>
+              <Switch
+                value={emergencial}
+                onValueChange={setEmergencial}
+                trackColor={{ false: '#ccc', true: '#FF5252' }}
+                thumbColor={emergencial ? '#fff' : '#fff'}
+              />
+            </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity 

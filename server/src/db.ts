@@ -63,6 +63,7 @@ export const initDb = async () => {
         user_id INTEGER REFERENCES "user"(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         phone VARCHAR(50) NOT NULL,
+        emergencial BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);

@@ -181,9 +181,9 @@ export default function Contatos() {
           {/* Seção Emergenciais */}
           {contatosEmergenciais.length > 0 && (
             <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 8 }}>
-                <MaterialIcons name="warning" size={18} color="#FF5252" />
-                <Text style={{ color: '#FF5252', fontWeight: 'bold', marginLeft: 6, fontSize: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 12 }}>
+                <MaterialIcons name="warning" size={24} color="#FF5252" />
+                <Text style={{ color: '#FF5252', fontWeight: 'bold', marginLeft: 8, fontSize: 18 }}>
                   Contatos Emergenciais
                 </Text>
               </View>
@@ -199,9 +199,9 @@ export default function Contatos() {
           {contatosNormais.length > 0 && (
             <View>
               {contatosEmergenciais.length > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, marginTop: 16 }}>
-                  <MaterialIcons name="people" size={18} color={colors.secondary} />
-                  <Text style={{ color: colors.secondary, fontWeight: 'bold', marginLeft: 6, fontSize: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 20 }}>
+                  <MaterialIcons name="people" size={24} color={colors.text} />
+                  <Text style={{ color: colors.text, fontWeight: 'bold', marginLeft: 8, fontSize: 18 }}>
                     Outros Contatos
                   </Text>
                 </View>

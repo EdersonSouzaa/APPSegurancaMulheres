@@ -83,6 +83,9 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     shadowOpacity: 0.2,
     shadowRadius: 6,
   },
+  sendButtonDisabled: {
+    opacity: 0.7,
+  },
   sendButtonText: {
     color: '#FFFFFF',
     fontSize: 18,

@@ -57,11 +57,9 @@ router.post('/', authenticateToken, async (req: any, res: Response) => {
 });
 
 // List all Ocorrencias — community feed for the "Gerais" tab
-router.get('/', authenticateToken, async (_req: any, res: Response) => {
+router.get('/', authenticateToken, async (req: any, res: Response) => {
   try {
-    const result = await query(
-      'SELECT * FROM "ocorrencia" ORDER BY created_at DESC'
-    );
+    const result = await query('SELECT * FROM "ocorrencia" WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id]);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching ocorrencias:', error);

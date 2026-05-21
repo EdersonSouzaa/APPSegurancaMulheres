@@ -19,18 +19,19 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import * as Location from 'expo-location';
 
 export default function Settings() {
   const router = useRouter();
   const { isDarkMode, toggleTheme } = useTheme();
-  
+
   // Navegação interna na aba de configurações
   const [currentSubScreen, setCurrentSubScreen] = useState<'main' | 'security'>('main');
   const [faqModalVisible, setFaqModalVisible] = useState(false);
-  
+
   // Preferências do usuário
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
-  const [isLocationEnabled, setIsLocationEnabled] = useState(true);
+  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
 
   // Biometria local
   const [isBiometryEnabled, setIsBiometryEnabled] = useState(false);
@@ -67,7 +68,7 @@ export default function Settings() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) return;
-      
+
       // Busca informações do usuário no backend
       const userData = await api.get('/user/me', token);
       if (userData) {
@@ -91,7 +92,7 @@ export default function Settings() {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) return;
-      
+
       await api.put('/user/preferences', {
         notifications_enabled: value,
         location_enabled: isLocationEnabled
@@ -104,11 +105,25 @@ export default function Settings() {
   };
 
   const handleToggleLocation = async (value: boolean) => {
+    // Se o usuário está ATIVANDO, pede a permissão nativa do sistema primeiro
+    if (value) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        // Usuário negou a permissão do sistema → não altera o toggle
+        Alert.alert(
+          'Permissão Necessária',
+          'Para ativar a localização em tempo real, é preciso permitir o acesso à localização nas configurações do seu celular.',
+          [{ text: 'OK' }]
+        );
+        return; // Não continua sem a permissão
+      }
+    }
+
     setIsLocationEnabled(value);
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) return;
-      
+
       await api.put('/user/preferences', {
         notifications_enabled: isNotificationsEnabled,
         location_enabled: value
@@ -148,20 +163,20 @@ export default function Settings() {
   // Alterna o status SOS/emergencial do contato na tela de segurança
   const handleToggleEmergencyStatus = async (contact: any) => {
     const updatedStatus = !contact.emergencial;
-    
+
     // Atualização otimista na interface
     setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, emergencial: updatedStatus } : c));
-    
+
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) return;
-      
+
       await api.put(`/contatos/${contact.id}`, {
         name: contact.name,
         phone: contact.phone,
         emergencial: updatedStatus
       }, token);
-      
+
     } catch (error) {
       console.error('Erro ao atualizar status de emergência:', error);
       Alert.alert('Erro', 'Não foi possível atualizar o status do contato.');
@@ -176,7 +191,7 @@ export default function Settings() {
       Alert.alert('Aviso', 'Preencha todos os campos de senha.');
       return;
     }
-    
+
     if (newPassword !== confirmPassword) {
       Alert.alert('Erro', 'A nova senha e a confirmação não coincidem.');
       return;
@@ -214,12 +229,12 @@ export default function Settings() {
   };
 
   const SettingItem = ({ icon, title, subtitle, onPress, isLast, rightElement }: any) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.settingItem, 
+        styles.settingItem,
         { borderBottomColor: colors.border },
         isLast && styles.lastItem
-      ]} 
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
       disabled={!onPress}
@@ -268,16 +283,16 @@ export default function Settings() {
     });
 
     return (
-      <TouchableOpacity 
-        activeOpacity={0.8} 
+      <TouchableOpacity
+        activeOpacity={0.8}
         onPress={toggleTheme}
       >
         <Animated.View style={[styles.customSwitchContainer, { backgroundColor }]}>
           <Animated.View style={[styles.customSwitchThumb, { transform: [{ translateX }] }]}>
-            <MaterialCommunityIcons 
-              name={isDarkMode ? "moon-waning-crescent" : "white-balance-sunny"} 
-              size={16} 
-              color={isDarkMode ? "#FFD700" : "#FFA500"} 
+            <MaterialCommunityIcons
+              name={isDarkMode ? "moon-waning-crescent" : "white-balance-sunny"}
+              size={16}
+              color={isDarkMode ? "#FFD700" : "#FFA500"}
             />
           </Animated.View>
         </Animated.View>
@@ -290,11 +305,11 @@ export default function Settings() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'left', 'right']}>
         <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.headerBg} />
-        
+
         {/* Cabeçalho da sub-tela de Segurança */}
         <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-          <TouchableOpacity 
-            style={[styles.backButton, { backgroundColor: colors.backBtnBg }]} 
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.backBtnBg }]}
             onPress={() => setCurrentSubScreen('main')}
           >
             <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
@@ -303,16 +318,16 @@ export default function Settings() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          
+
           {/* Biometria */}
           <Section title="Acesso e Biometria">
-            <SettingItem 
-              icon="fingerprint" 
-              title="Acesso por Biometria" 
+            <SettingItem
+              icon="fingerprint"
+              title="Acesso por Biometria"
               subtitle="Desbloqueio rápido e seguro"
               rightElement={
-                <Switch 
-                  value={isBiometryEnabled} 
+                <Switch
+                  value={isBiometryEnabled}
                   onValueChange={handleToggleBiometry}
                   trackColor={{ false: '#D1D1D1', true: colors.primary }}
                   thumbColor={'#FFF'}
@@ -361,7 +376,7 @@ export default function Settings() {
                 />
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.savePasswordButton, { backgroundColor: colors.primary }]}
                 onPress={handleUpdatePassword}
                 disabled={passwordLoading}
@@ -390,7 +405,7 @@ export default function Settings() {
                 <Text style={[styles.emptyContactsText, { color: colors.subtitle }]}>
                   Nenhum contato cadastrado ainda.
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.linkButton, { borderColor: colors.primary }]}
                   onPress={() => {
                     setCurrentSubScreen('main');
@@ -403,19 +418,19 @@ export default function Settings() {
             ) : (
               <View style={styles.contactsList}>
                 {contacts.map((item, index) => (
-                  <View 
-                    key={item.id} 
+                  <View
+                    key={item.id}
                     style={[
-                      styles.contactItemRow, 
+                      styles.contactItemRow,
                       { borderBottomColor: colors.border },
                       index === contacts.length - 1 && styles.lastItem
                     ]}
                   >
                     <View style={[styles.contactIconBox, { backgroundColor: colors.iconBox }]}>
-                      <MaterialCommunityIcons 
-                        name={item.emergencial ? "shield-alert" : "account"} 
-                        size={22} 
-                        color={item.emergencial ? colors.primary : colors.subtitle} 
+                      <MaterialCommunityIcons
+                        name={item.emergencial ? "shield-alert" : "account"}
+                        size={22}
+                        color={item.emergencial ? colors.primary : colors.subtitle}
                       />
                     </View>
                     <View style={styles.contactDetails}>
@@ -433,7 +448,7 @@ export default function Settings() {
               </View>
             )}
           </Section>
-          
+
         </ScrollView>
       </SafeAreaView>
     );
@@ -443,10 +458,10 @@ export default function Settings() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.headerBg} />
-      
+
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <TouchableOpacity 
-          style={[styles.backButton, { backgroundColor: colors.backBtnBg }]} 
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: colors.backBtnBg }]}
           onPress={() => router.back()}
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
@@ -456,32 +471,32 @@ export default function Settings() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Section title="Conta">
-          <SettingItem 
-            icon="shield-lock-outline" 
-            title="Segurança" 
+          <SettingItem
+            icon="shield-lock-outline"
+            title="Segurança"
             subtitle="Alterar senha e biometria"
             onPress={() => {
               setCurrentSubScreen('security');
               fetchContacts();
-            }} 
+            }}
             isLast
           />
         </Section>
 
         <Section title="Segurança ElaSegura">
-          <SettingItem 
-            icon="account-group-outline" 
-            title="Contatos de Emergência" 
+          <SettingItem
+            icon="account-group-outline"
+            title="Contatos de Emergência"
             subtitle="Gerencie seus contatos SOS"
-            onPress={() => router.push('/contatos')} 
+            onPress={() => router.push('/contatos')}
           />
-          <SettingItem 
-            icon="map-marker-radius-outline" 
-            title="Localização em Tempo Real" 
+          <SettingItem
+            icon="map-marker-radius-outline"
+            title="Localização em Tempo Real"
             subtitle="Ativar compartilhamento de rota"
             rightElement={
-              <Switch 
-                value={isLocationEnabled} 
+              <Switch
+                value={isLocationEnabled}
                 onValueChange={handleToggleLocation}
                 trackColor={{ false: '#D1D1D1', true: colors.primary }}
                 thumbColor={'#FFF'}
@@ -492,13 +507,13 @@ export default function Settings() {
         </Section>
 
         <Section title="Preferências">
-          <SettingItem 
-            icon="bell-outline" 
-            title="Notificações" 
+          <SettingItem
+            icon="bell-outline"
+            title="Notificações"
             subtitle="Alertas e avisos sonoros"
             rightElement={
-              <Switch 
-                value={isNotificationsEnabled} 
+              <Switch
+                value={isNotificationsEnabled}
                 onValueChange={handleToggleNotifications}
                 trackColor={{ false: '#D1D1D1', true: colors.primary }}
                 thumbColor={'#FFF'}
@@ -509,9 +524,9 @@ export default function Settings() {
         </Section>
 
         <Section title="Temas">
-          <SettingItem 
-            icon="theme-light-dark" 
-            title="Tema do Aplicativo" 
+          <SettingItem
+            icon="theme-light-dark"
+            title="Tema do Aplicativo"
             subtitle={isDarkMode ? "Tema Escuro Ativado" : "Tema Padrão Original"}
             rightElement={<MoonSwitch />}
             isLast
@@ -519,28 +534,28 @@ export default function Settings() {
         </Section>
 
         <Section title="Suporte">
-          <SettingItem 
-            icon="help-circle-outline" 
-            title="Central de Ajuda" 
-            onPress={() => setFaqModalVisible(true)} 
+          <SettingItem
+            icon="help-circle-outline"
+            title="Central de Ajuda"
+            onPress={() => setFaqModalVisible(true)}
           />
-          <SettingItem 
-            icon="information-outline" 
-            title="Sobre o App" 
-            onPress={() => router.push('/about')} 
+          <SettingItem
+            icon="information-outline"
+            title="Sobre o App"
+            onPress={() => router.push('/about')}
             isLast
           />
         </Section>
 
-        <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: colors.cardBg, borderColor: isDarkMode ? '#333' : '#FFDEDE' }]} 
-          activeOpacity={0.8} 
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: colors.cardBg, borderColor: isDarkMode ? '#333' : '#FFDEDE' }]}
+          activeOpacity={0.8}
           onPress={() => router.replace('/login')}
         >
           <MaterialCommunityIcons name="logout" size={22} color={colors.primary} />
           <Text style={[styles.logoutText, { color: colors.primary }]}>Sair da Conta</Text>
         </TouchableOpacity>
-        
+
         <Text style={[styles.versionText, { color: colors.subtitle }]}>Versão 1.0.0</Text>
       </ScrollView>
 
@@ -597,7 +612,7 @@ export default function Settings() {
               </View>
             </ScrollView>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.closeButton, { backgroundColor: colors.primary }]}
               onPress={() => setFaqModalVisible(false)}
             >
@@ -727,7 +742,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
   },
-  
+
   // Estilos da Sub-tela de Segurança
   passwordForm: {
     padding: 20,
@@ -822,7 +837,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 1,
   },
-  
+
   // Estilos do Modal Central de Ajuda
   modalOverlay: {
     flex: 1,

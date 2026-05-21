@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -29,14 +30,7 @@ type Occurrence = {
   distance: number;
 };
 
-const initialOccurrences: Occurrence[] = [
-  { id: 1, title: 'Roubo', desc: 'Pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error', distance: 250 },
-  { id: 2, title: 'Assedio', desc: 'Assoviaram para mim', time: '15 Abril, 11:30', type: 'error', distance: 800 },
-  { id: 3, title: 'Inseguranca', desc: 'Rua muito escura e sem policiamento', time: '16 Abril, 20:15', type: 'warning', distance: 1500 },
-  { id: 4, title: 'Tentativa de Furto', desc: 'Tentaram puxar minha bolsa', time: '18 Abril, 08:45', type: 'error', distance: 450 },
-  { id: 5, title: 'Assedio Verbal', desc: 'Comentarios ofensivos no onibus', time: '20 Abril, 14:20', type: 'error', distance: 3000 },
-  { id: 6, title: 'Suspeita', desc: 'Carro seguindo lentamente', time: '21 Abril, 19:00', type: 'warning', distance: 120 },
-];
+const initialOccurrences: Occurrence[] = [];
 
 const occurrenceTypes: { label: string; value: OccurrenceType; icon: keyof typeof MaterialIcons.glyphMap }[] = [
   { label: 'Emergencia', value: 'error', icon: 'error' },
@@ -55,6 +49,29 @@ export default function Ocorrencias() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<OccurrenceType>('error');
+  const [distance, setDistance] = useState<number>(500);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const storedData = await AsyncStorage.getItem('@occurrences_data');
+        if (storedData) {
+          setOccurrences(JSON.parse(storedData));
+        }
+      } catch (e) {
+        console.error('Failed to load occurrences', e);
+      }
+    };
+    loadData();
+  }, []);
+
+  const saveOccurrences = async (newOccurrences: Occurrence[]) => {
+    try {
+      await AsyncStorage.setItem('@occurrences_data', JSON.stringify(newOccurrences));
+    } catch (e) {
+      console.error('Failed to save occurrences', e);
+    }
+  };
 
   const canSave = title.trim().length > 0 && description.trim().length > 0;
 
@@ -64,7 +81,7 @@ export default function Ocorrencias() {
     }
 
     return [...occurrences]
-      .filter((item) => item.distance <= radiusFilter)
+      .filter((item) => item.distance === radiusFilter)
       .sort((a, b) => a.distance - b.distance);
   }, [activeTab, occurrences, radiusFilter]);
 
@@ -72,6 +89,7 @@ export default function Ocorrencias() {
     setTitle('');
     setDescription('');
     setType('error');
+    setDistance(500);
   };
 
   const closeModal = () => {
@@ -100,10 +118,13 @@ export default function Ocorrencias() {
       desc: description.trim(),
       time: formatOccurrenceTime(),
       type,
-      distance: 0,
+      distance,
     };
 
-    setOccurrences((currentOccurrences) => [newOccurrence, ...currentOccurrences]);
+    const updatedOccurrences = [newOccurrence, ...occurrences];
+    setOccurrences(updatedOccurrences);
+    saveOccurrences(updatedOccurrences);
+    
     setActiveTab('gerais');
     closeModal();
   };
@@ -223,12 +244,17 @@ export default function Ocorrencias() {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="map-marker-off-outline"
-              size={60}
-              color={isDarkMode ? '#333' : '#EFEFEF'}
-            />
-            <Text style={styles.emptyText}>Nenhuma ocorrencia neste raio.</Text>
+            <View style={styles.emptyIconContainer}>
+              <MaterialCommunityIcons
+                name="shield-check-outline"
+                size={50}
+                color={colors.primary}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Tudo tranquilo por aqui!</Text>
+            <Text style={styles.emptyText}>
+              Nao ha ocorrencias registradas no momento.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -273,6 +299,28 @@ export default function Ocorrencias() {
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            <Text style={styles.inputLabel}>Distancia estimada</Text>
+            <View style={{ marginBottom: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
+                {[
+                  { label: '500m', value: 500 },
+                  { label: '1km', value: 1000 },
+                  { label: '2km', value: 2000 },
+                  { label: '5km', value: 5000 },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[styles.filterChip, distance === item.value && styles.activeFilterChip]}
+                    onPress={() => setDistance(item.value)}
+                  >
+                    <Text style={[styles.filterChipText, distance === item.value && styles.activeFilterChipText]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
             <Text style={styles.inputLabel}>Titulo</Text>

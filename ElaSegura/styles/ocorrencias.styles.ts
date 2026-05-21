@@ -195,12 +195,30 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
     emptyContainer: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingTop: 50,
+      paddingTop: 80,
+      paddingHorizontal: 30,
+    },
+    emptyIconContainer: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: isDarkMode ? colors.accent : '#FFF0F2',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
     },
     emptyText: {
-      fontSize: 16,
+      fontSize: 15,
       color: colors.secondary,
-      marginTop: 10,
+      textAlign: 'center',
+      lineHeight: 22,
     },
     modalOverlay: {
       flex: 1,

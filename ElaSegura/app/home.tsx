@@ -8,9 +8,10 @@ import {
   StatusBar,
   Platform,
   Modal,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Notifications from 'expo-notifications';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/home.styles';
 import { useRouter } from 'expo-router';
@@ -20,72 +21,82 @@ import { Colors } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LeafletMap } from '../components/LeafletMap';
 import { useLocation } from '../hooks/use-location';
+import { api } from '../services/api';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 
 const Contatos_image = require('../assets/images/contatos.png');
 const Alerta_image = require('../assets/images/alerta.png');
 const Areas_image = require('../assets/images/areas.png');
 
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-}
-
 const Home = () => {
   const router = useRouter();
   const { isDarkMode, theme } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
-  
-   const colors = Colors[theme];
-  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
-
+  const [locationPopupVisible, setLocationPopupVisible] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
   const [userName, setUserName] = useState('');
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [occurrences, setOccurrences] = useState<any[]>([]);
   const { coords } = useLocation();
+
+  const colors = Colors[theme];
+  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+
+  // --- FUNÇÕES DE CARREGAMENTO (Definidas no escopo do componente) ---
+
+  const loadUserData = useCallback(async () => {
+    try {
+      const savedUser = await AsyncStorage.getItem('user');
+      if (savedUser) {
+        const user = JSON.parse(savedUser);
+        const firstName = user.name.split(' ')[0];
+        setUserName(firstName);
+        setProfilePicture(user.profile_picture || null);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    }
+  }, []);
+
+  const loadLocationPreference = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        const userData = await api.get('/user/me', token);
+        if (userData) {
+          setLocationEnabled(userData.location_enabled || false);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar preferência de localização:', error);
+    }
+  }, []);
+
+  const loadOccurrences = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        const data = await api.get('/ocorrencias', token);
+        setOccurrences(data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar ocorrências:', error);
+    }
+  }, []);
+
+  // --- EFEITO DE FOCO (Unificado em um único hook) ---
 
   useFocusEffect(
     useCallback(() => {
-      const loadUserData = async () => {
-        try {
-          const savedUser = await AsyncStorage.getItem('user');
-          if (savedUser) {
-            const user = JSON.parse(savedUser);
-            // Pega apenas o primeiro nome para ficar mais amigável
-            const firstName = user.name.split(' ')[0];
-            setUserName(firstName);
-            setProfilePicture(user.profile_picture || null);
-          }
-        } catch (error) {
-          console.error('Erro ao carregar dados:', error);
-        }
-      };
       loadUserData();
-    }, [])
+      loadLocationPreference();
+      loadOccurrences();
+    }, [loadUserData, loadLocationPreference, loadOccurrences])
   );
 
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    (async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Permissão para notificações negada');
-      }
-    })();
-  }, []);
-
-  const mockOcorrencias = [
-    { id: 1, title: 'Roubo', desc: 'pegaram meu celular na esquina', time: '10 Abril, 10:59', type: 'error' },
-    { id: 2, title: 'Assédio', desc: 'assoviaram para mim', time: '15 Abril, 11:30', type: 'error' },
-    { id: 3, title: 'Insegurança', desc: 'Rua muito escura e sem policiamento', time: '16 Abril, 20:15', type: 'warning' },
-    { id: 4, title: 'Tentativa de Furto', desc: 'Tentaram puxar minha bolsa', time: '18 Abril, 08:45', type: 'error' },
-    { id: 5, title: 'Assédio Verbal', desc: 'Comentários ofensivos no ônibus', time: '20 Abril, 14:20', type: 'error' },
-  ];
-  
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? colors.cardBackground : "#FFF"} />
@@ -94,16 +105,16 @@ const Home = () => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Cabeçalho esticado até as bordas */}
+        {/* Cabeçalho */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerContent}>
               <Text style={styles.headerGreeting}>Olá, {userName || 'Usuária'} 👋</Text>
               <Text style={styles.headerStatus}>Você está segura aqui 💜</Text>
             </View>
-            
-            <TouchableOpacity 
-              style={styles.headerAvatar} 
+
+            <TouchableOpacity
+              style={styles.headerAvatar}
               onPress={() => router.push('/perfil')}
               activeOpacity={0.8}
             >
@@ -121,13 +132,18 @@ const Home = () => {
           <TouchableOpacity
             activeOpacity={0.9}
             style={styles.mapCard}
-            onPress={() => router.push('/mapa')}
+            onPress={() => {
+              if (locationEnabled) {
+                router.push('/mapa');
+              } else {
+                setLocationPopupVisible(true);
+              }
+            }}
           >
             <LeafletMap
               userCoords={coords}
               riskZones={[]}
               incidents={[]}
-              showRiskZones={false}
               showIncidents={false}
               isDarkMode={isDarkMode}
               interactive={false}
@@ -141,7 +157,6 @@ const Home = () => {
           {/* Acesso rápido */}
           <Text style={styles.sectionTitle}>Acesso rápido</Text>
           <View style={styles.quickAccessGrid}>
-            {/* 1. Ocorrências */}
             <QuickAccessCard
               styles={styles}
               icon={<MaterialCommunityIcons name="file-alert-outline" size={28} color={colors.primary} />}
@@ -149,7 +164,6 @@ const Home = () => {
               onPress={() => router.push('/ocorrencias')}
             />
 
-            {/* 2. Contatos SOS */}
             <QuickAccessCard
               styles={styles}
               icon={<Image source={Contatos_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
@@ -157,7 +171,6 @@ const Home = () => {
               onPress={() => router.push('/contatos')}
             />
 
-            {/* 3. Alertas Recentes */}
             <QuickAccessCard
               styles={styles}
               icon={<Image source={Alerta_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
@@ -165,19 +178,18 @@ const Home = () => {
               onPress={() => router.push('/alertas' as any)}
             />
 
-            {/* 4. Áreas de Risco */}
             <QuickAccessCard
-            styles={styles}
-        icon={<Image source={Areas_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
-        label="Áreas de risco"
-        onPress={() => router.push('/mapa' as any)}
-        />
+              styles={styles}
+              icon={<Image source={Areas_image} style={[styles.quickAccessIconImage, { tintColor: colors.primary }]} resizeMode="contain" />}
+              label="Áreas de risco"
+              onPress={() => router.push('/mapa' as any)}
+            />
           </View>
 
-          {/* Botão SOS centralizado */}
+          {/* Botão SOS */}
           <View style={styles.sosWrapper}>
-            <TouchableOpacity 
-              style={styles.sosButton} 
+            <TouchableOpacity
+              style={styles.sosButton}
               activeOpacity={0.8}
               onPress={() => router.push('/sos' as any)}
             >
@@ -217,25 +229,96 @@ const Home = () => {
         <NavItem active icon={<MaterialIcons name="home" size={28} color={colors.primary} />} label="Início" styles={styles} />
         <NavItem icon={<MaterialCommunityIcons name="alert-outline" size={28} color={colors.secondary} />} label="Ocorrencias" onPress={() => router.push('/ocorrencias')} styles={styles} />
         <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={28} color={colors.secondary} />} label="Contatos" onPress={() => router.push('/contatos')} styles={styles} />
-        <NavItem 
-          icon={<MaterialCommunityIcons name="bell-outline" size={28} color={colors.secondary} />} 
-          label="Alertas" 
-          onPress={() => router.push('/alertas' as any)}
-          styles={styles}
-        />
-        <NavItem 
-          icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color={colors.secondary} />} 
-          label="Perfil" 
-          onPress={() => router.push('/perfil')}
-          styles={styles}
-        />
-        <NavItem 
-          icon={<MaterialCommunityIcons name="cog-outline" size={28} color={colors.secondary} />} 
-          label="Ajustes" 
-          onPress={() => router.push('/settings')}
-          styles={styles}
-        />
+        <NavItem icon={<MaterialCommunityIcons name="bell-outline" size={28} color={colors.secondary} />} label="Alertas" onPress={() => router.push('/alertas' as any)} styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="account-circle-outline" size={28} color={colors.secondary} />} label="Perfil" onPress={() => router.push('/perfil')} styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="cog-outline" size={28} color={colors.secondary} />} label="Ajustes" onPress={() => router.push('/settings')} styles={styles} />
       </View>
+
+      {/* POPUP DE ATIVAÇÃO DE LOCALIZAÇÃO */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={locationPopupVisible}
+        onRequestClose={() => setLocationPopupVisible(false)}
+      >
+        <View style={styles.locationPopupOverlay}>
+          <View style={styles.locationPopupContent}>
+            <View style={styles.locationPopupIconBox}>
+              <MaterialCommunityIcons name="map-marker-radius" size={48} color={colors.primary} />
+            </View>
+            <Text style={styles.locationPopupTitle}>Ativar Localização?</Text>
+            <Text style={styles.locationPopupDescription}>
+              Para acessar o mapa e compartilhar sua localização em tempo real com seus contatos SOS, ative a permissão de localização.
+            </Text>
+            <TouchableOpacity
+              style={[styles.locationPopupButton, { backgroundColor: colors.primary }]}
+              onPress={async () => {
+                setLocationLoading(true);
+                try {
+                  const { status } = await Location.requestForegroundPermissionsAsync();
+
+                  if (status !== 'granted') {
+                    setLocationLoading(false);
+                    Alert.alert(
+                      'Permissão Necessária',
+                      'Você negou o acesso à localização. Para usar o mapa, ative a permissão de localização nas configurações do seu celular.',
+                      [{ text: 'OK' }]
+                    );
+                    return;
+                  }
+
+                  const token = await AsyncStorage.getItem('userToken');
+                  if (token) {
+                    await api.put('/user/preferences', {
+                      notifications_enabled: true,
+                      location_enabled: true
+                    }, token);
+                    setLocationEnabled(true);
+                  }
+
+                  setLocationLoading(false);
+                  setLocationPopupVisible(false);
+
+                  const { status: notifStatus } = await Notifications.getPermissionsAsync();
+                  if (notifStatus !== 'granted') {
+                    await Notifications.requestPermissionsAsync();
+                  }
+
+                  if (Constants.appOwnership !== 'expo') {
+                    await Notifications.scheduleNotificationAsync({
+                      content: {
+                        title: 'Localização Ativada',
+                        body: 'Sua localização está habilitada e o mapa será aberto.',
+                        sound: true,
+                      },
+                      trigger: null,
+                    });
+                  }
+                  router.push('/mapa');
+                } catch (error) {
+                  setLocationLoading(false);
+                  Alert.alert('Erro', 'Não foi possível ativar a localização. Tente novamente.');
+                }
+              }}
+              activeOpacity={0.8}
+              disabled={locationLoading}
+            >
+              {locationLoading ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.locationPopupButtonText}>Ativar Localização</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.locationPopupCancelButton}
+              onPress={() => setLocationPopupVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.locationPopupCancelText}>Agora não</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* POPUP DE OCORRÊNCIAS */}
       <Modal
@@ -248,8 +331,8 @@ const Home = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.sectionTitle}>Últimas Ocorrências</Text>
-              <TouchableOpacity 
-                style={styles.closeButton} 
+              <TouchableOpacity
+                style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
                 <MaterialIcons name="close" size={28} color={colors.text} />
@@ -257,18 +340,22 @@ const Home = () => {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {mockOcorrencias.map((item) => (
-                <View key={item.id} style={styles.occurrenceCard}>
-                  <View style={styles.occurrenceIconBox}>
-                    <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color={colors.primary} />
+              {occurrences.length === 0 ? (
+                <Text style={{ textAlign: 'center', marginTop: 20, color: colors.secondary }}>Nenhuma ocorrência encontrada.</Text>
+              ) : (
+                occurrences.map((item) => (
+                  <View key={item.id || item._id} style={styles.occurrenceCard}>
+                    <View style={styles.occurrenceIconBox}>
+                      <MaterialIcons name={item.type === 'error' ? "error" : "warning"} size={30} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.occurrenceTitle}>{item.title}</Text>
+                      <Text style={styles.occurrenceDescription}>{item.description || item.desc}</Text>
+                      <Text style={styles.occurrenceTime}>{item.time}</Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.occurrenceTitle}>{item.title}</Text>
-                    <Text style={styles.occurrenceDescription}>{item.desc}</Text>
-                    <Text style={styles.occurrenceTime}>{item.time}</Text>
-                  </View>
-                </View>
-              ))}
+                ))
+              )}
               <View style={{ height: 20 }} />
             </ScrollView>
           </View>
@@ -277,6 +364,8 @@ const Home = () => {
     </SafeAreaView>
   );
 };
+
+// --- COMPONENTES AUXILIARES ---
 
 const QuickAccessCard = ({ icon, label, onPress, styles }: any) => (
   <TouchableOpacity style={styles.quickAccessCard} activeOpacity={0.7} onPress={onPress}>

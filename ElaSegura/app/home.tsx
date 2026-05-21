@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/home.styles';
@@ -17,8 +18,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LeafletMap } from '../components/LeafletMap';
+import { useLocation } from '../hooks/use-location';
 
-const MAPA_IMAGE = require('../assets/images/mapa.png');
 const Contatos_image = require('../assets/images/contatos.png');
 const Alerta_image = require('../assets/images/alerta.png');
 const Areas_image = require('../assets/images/areas.png');
@@ -44,6 +46,7 @@ const Home = () => {
 
   const [userName, setUserName] = useState('');
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const { coords } = useLocation();
 
   useFocusEffect(
     useCallback(() => {
@@ -84,7 +87,7 @@ const Home = () => {
   ];
   
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? colors.cardBackground : "#FFF"} />
 
       <ScrollView
@@ -114,17 +117,25 @@ const Home = () => {
         </View>
 
         <View style={styles.content}>
-          {/* Mapa com bordas bem arredondadas */}
-          <TouchableOpacity 
-            activeOpacity={0.9} 
+          {/* Mapa em tempo real (preview) */}
+          <TouchableOpacity
+            activeOpacity={0.9}
             style={styles.mapCard}
-            onPress={() => router.push('/mapa')} 
+            onPress={() => router.push('/mapa')}
           >
-            <Image
-              source={MAPA_IMAGE}
-              style={styles.mapImage}
-              resizeMode="cover"
+            <LeafletMap
+              userCoords={coords}
+              riskZones={[]}
+              incidents={[]}
+              showRiskZones={false}
+              showIncidents={false}
+              isDarkMode={isDarkMode}
+              interactive={false}
             />
+            <View style={styles.mapCardBadge}>
+              <MaterialCommunityIcons name="map-outline" size={14} color="#fff" />
+              <Text style={styles.mapCardBadgeText}>Ver mapa em tempo real</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Acesso rápido */}
@@ -263,7 +274,7 @@ const Home = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 

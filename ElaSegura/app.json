@@ -38,6 +38,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permita que o ElaSegura acesse sua localização para mostrar áreas de risco e ocorrências próximas em tempo real."
+        }
       ]
     ],
     "experiments": {

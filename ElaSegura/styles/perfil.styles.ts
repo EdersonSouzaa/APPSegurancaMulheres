@@ -42,6 +42,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     width: 80,
     height: 80,
     borderRadius: 40,
+    overflow: 'hidden',
     backgroundColor: isDarkMode ? colors.primary : '#1A1A1A',
     justifyContent: 'center',
     alignItems: 'center',

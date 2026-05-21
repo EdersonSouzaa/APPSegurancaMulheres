@@ -12,6 +12,7 @@ import {
   Switch,
   ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/contatos.styles';
 import { router } from 'expo-router';
@@ -141,7 +142,7 @@ export default function Contatos() {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
 
       {/* Cabeçalho */}
@@ -275,6 +276,6 @@ export default function Contatos() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }

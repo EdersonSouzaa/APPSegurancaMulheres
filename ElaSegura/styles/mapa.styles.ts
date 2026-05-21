@@ -1,8 +1,8 @@
 import { StyleSheet, Platform } from 'react-native';
 
 export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
-  container: { 
-    flex: 1, 
+  container: {
+    flex: 1,
     backgroundColor: isDarkMode ? colors.background : '#F5F5F5',
   },
   header: {
@@ -10,7 +10,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 15 : 10, // Copiado do seu home.styles.ts para manter o padrão
+    paddingTop: Platform.OS === 'android' ? 15 : 10,
     paddingBottom: 20,
     backgroundColor: isDarkMode ? colors.cardBackground : '#FFF',
     elevation: 3,
@@ -20,41 +20,91 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     shadowRadius: 3,
     zIndex: 10,
   },
-  title: { 
-    fontSize: 20, 
+  title: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
   },
-  backButton: { 
-    padding: 5 
+  backButton: {
+    padding: 5,
   },
   mapContainer: {
     flex: 1,
     position: 'relative',
-    backgroundColor: isDarkMode ? '#1A1A1A' : '#E8EAED', 
+    backgroundColor: isDarkMode ? '#1A1A1A' : '#E8EAED',
   },
-  scrollVertical: {
-    flex: 1,
-  },
-  mapImage: {
-    width: 1500, 
-    height: 1200,
-  },
-  legendaContainer: {
+  filterBar: {
     position: 'absolute',
-    bottom: 25,
-    right: 20,
-    backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF', 
-    borderRadius: 12,
-    padding: 15, 
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 5,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary ?? '#9C27B0',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
+  fabColumn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 24,
+    gap: 12,
+  },
+  fab: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: isDarkMode ? colors.cardBackground : '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  legendaImage: {
-    width: 130,   // Estava 90
-    height: 170,  // Estava 110
-  }
+  fabPrimary: {
+    backgroundColor: colors.primary ?? '#9C27B0',
+  },
+  statusBanner: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 90,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 13,
+    flexShrink: 1,
+  },
 });

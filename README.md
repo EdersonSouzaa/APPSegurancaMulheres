@@ -1,121 +1,128 @@
-# ElaSegura — Women's Safety App
+# ElaSegura — Aplicativo de Segurança para Mulheres
 
-ElaSegura is a mobile application built to help protect women. It allows users to send emergency SOS alerts to trusted contacts, report safety incidents, and view a collaborative real-time map of risk areas in their community. The project is a university extension initiative developed to promote personal safety through technology.
-
----
-
-## Features
-
-- **User Authentication** — Register, log in, and reset your password securely. Passwords are encrypted and sessions are managed with JWT tokens.
-- **SOS Panic Button** — Send an instant emergency alert that shares your real-time GPS location with your trusted contacts.
-- **Emergency Contacts** — Add, edit, and manage a personal list of trusted contacts who will be notified in case of an emergency.
-- **Interactive Safety Map** — View a real-time map powered by Leaflet. Report incidents and visualize risk zones marked by the community.
-- **Incident Reports (Ocorrências)** — Log safety incidents with a title, description, type (error or warning), and geolocation coordinates.
-- **Alerts Feed** — View a timeline of recent alerts and incidents reported by you or nearby users.
-- **Incident Notebook** — Write and save personal safety notes or evidence inside the app.
-- **User Profile** — Update your name, email, and profile picture.
-- **Settings** — Toggle location sharing and notification preferences. The app dynamically reads your backend server IP, so no manual configuration is needed.
-- **Light and Dark Mode** — Full theme support across all screens.
+O **ElaSegura** é um aplicativo móvel desenvolvido para ajudar na proteção das mulheres. Ele permite que as usuárias enviem alertas de emergência (SOS) para contatos de confiança, registrem ocorrências de segurança e visualizem um mapa colaborativo em tempo real com áreas de risco em sua comunidade. O projeto é uma iniciativa de extensão universitária criada para promover a segurança pessoal por meio da tecnologia.
 
 ---
 
-## Technologies
+## Funcionalidades
 
-### Frontend (Mobile App)
-| Technology | Purpose |
-|---|---|
-| React Native | Cross-platform mobile framework |
-| Expo (SDK 54) | Development toolchain and native modules |
-| Expo Router | File-based navigation |
-| TypeScript | Static typing |
-| Leaflet (via WebView) | Interactive map rendering |
-| TanStack React Query | Server state management |
-| Expo Location | GPS and geolocation access |
-| Expo Notifications | Local push notifications |
-| AsyncStorage | Persistent local storage |
-| Expo Blur | Blur effects for UI popups |
-
-### Backend (REST API)
-| Technology | Purpose |
-|---|---|
-| Node.js | Runtime environment |
-| Express.js | HTTP server and routing |
-| TypeScript | Static typing |
-| PostgreSQL | Relational database |
-| node-postgres (`pg`) | Database client |
-| bcryptjs | Password hashing |
-| JSON Web Token (JWT) | Stateless authentication |
-| dotenv | Environment variable management |
-| nodemon | Auto-restart during development |
+* **Autenticação de Usuário** — Cadastre-se, faça login e redefina sua senha com segurança. As senhas são criptografadas e as sessões são gerenciadas por meio de tokens JWT.
+* **Botão de Pânico (SOS)** — Envie um alerta de emergência instantâneo compartilhando sua localização em tempo real com seus contatos de confiança.
+* **Contatos de Emergência** — Adicione, edite e gerencie uma lista personalizada de contatos que serão notificados em caso de emergência.
+* **Mapa Interativo de Segurança** — Visualize um mapa em tempo real utilizando Leaflet. Registre ocorrências e acompanhe áreas de risco marcadas pela comunidade.
+* **Registro de Ocorrências** — Cadastre incidentes de segurança com título, descrição, tipo (erro ou aviso) e coordenadas de geolocalização.
+* **Feed de Alertas** — Acompanhe uma linha do tempo com os alertas e ocorrências recentes registrados por você ou por usuários próximos.
+* **Caderno de Ocorrências** — Escreva e salve anotações pessoais ou evidências relacionadas à sua segurança dentro do aplicativo.
+* **Perfil do Usuário** — Atualize seu nome, e-mail e foto de perfil.
+* **Configurações** — Ative ou desative o compartilhamento de localização e as preferências de notificações. O aplicativo detecta automaticamente o endereço IP do servidor backend, sem necessidade de configuração manual.
+* **Modo Claro e Escuro** — Suporte completo aos temas claro e escuro em todas as telas.
 
 ---
 
-## How to Run
+## Tecnologias
 
-### Requirements
-- **Node.js** v18 or higher
-- **PostgreSQL** installed and running locally
-- **Expo Go** app installed on your mobile device (Android or iOS)
-- Both your computer and phone must be on the **same Wi-Fi network**
+### Frontend (Aplicativo Mobile)
+
+| Tecnologia            | Finalidade                                            |
+| --------------------- | ----------------------------------------------------- |
+| React Native          | Framework multiplataforma para desenvolvimento mobile |
+| Expo (SDK 54)         | Ferramentas de desenvolvimento e módulos nativos      |
+| Expo Router           | Navegação baseada em arquivos                         |
+| TypeScript            | Tipagem estática                                      |
+| Leaflet (via WebView) | Renderização do mapa interativo                       |
+| TanStack React Query  | Gerenciamento do estado do servidor                   |
+| Expo Location         | Acesso ao GPS e geolocalização                        |
+| Expo Notifications    | Notificações locais                                   |
+| AsyncStorage          | Armazenamento local persistente                       |
+| Expo Blur             | Efeitos de desfoque para pop-ups da interface         |
+
+### Backend (API REST)
+
+| Tecnologia           | Finalidade                                           |
+| -------------------- | ---------------------------------------------------- |
+| Node.js              | Ambiente de execução                                 |
+| Express.js           | Servidor HTTP e roteamento                           |
+| TypeScript           | Tipagem estática                                     |
+| PostgreSQL           | Banco de dados relacional                            |
+| node-postgres (`pg`) | Cliente de conexão com PostgreSQL                    |
+| bcryptjs             | Criptografia de senhas                               |
+| JSON Web Token (JWT) | Autenticação sem estado (Stateless)                  |
+| dotenv               | Gerenciamento de variáveis de ambiente               |
+| nodemon              | Reinicialização automática durante o desenvolvimento |
 
 ---
 
-### Step 1 — Set up the Backend
+## Como Executar
 
-Open a terminal inside the `server` folder:
+### Requisitos
+
+* **Node.js** versão 18 ou superior
+* **PostgreSQL** instalado e em execução localmente
+* Aplicativo **Expo Go** instalado em seu dispositivo Android ou iOS
+* O computador e o celular devem estar conectados à **mesma rede Wi-Fi**
+
+---
+
+### Passo 1 — Configurar o Backend
+
+Abra um terminal dentro da pasta `server`:
 
 ```bash
 cd server
 npm install
 ```
 
-Rename the example environment file and fill in your credentials:
+Renomeie o arquivo de exemplo das variáveis de ambiente e configure suas credenciais:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and set your PostgreSQL connection string:
+Abra o arquivo `.env` e configure a conexão com o PostgreSQL:
 
 ```env
-DATABASE_URL=postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/elasegura
-JWT_SECRET=your_secret_key
+DATABASE_URL=postgresql://SEU_USUARIO:SUA_SENHA@localhost:5432/elasegura
+JWT_SECRET=sua_chave_secreta
 PORT=3000
 ```
 
-> **Note:** You must create a PostgreSQL database named `elasegura` before starting. The tables will be created automatically on the first run.
+> **Observação:** É necessário criar previamente um banco de dados PostgreSQL chamado `elasegura`. As tabelas serão criadas automaticamente na primeira execução.
 
-Start the backend server:
+Inicie o servidor backend:
 
 ```bash
 npm run dev
 ```
 
-The API will be available at `http://localhost:3000`.
+A API ficará disponível em:
+
+```text
+http://localhost:3000
+```
 
 ---
 
-### Step 2 — Set up the Frontend
+### Passo 2 — Configurar o Frontend
 
-Open another terminal inside the `ElaSegura` folder:
+Abra outro terminal dentro da pasta `ElaSegura`:
 
 ```bash
 cd ElaSegura
 npm install
 ```
 
-Start the app:
+Inicie o aplicativo:
 
 ```bash
 npm start
 ```
 
-This will open the Expo Metro Bundler. Scan the QR code with the **Expo Go** app on your phone, or press `a` for Android / `i` for iOS emulator.
+O Expo Metro Bundler será aberto. Escaneie o QR Code utilizando o aplicativo **Expo Go** no seu celular ou pressione:
 
-> **Note:** The app automatically detects your computer's local IP address. You do not need to create or edit any `.env` file in the frontend folder.
+* `a` para abrir no emulador Android;
+* `i` para abrir no simulador iOS.
+
+> **Observação:** O aplicativo detecta automaticamente o endereço IP local do computador. Não é necessário criar ou editar nenhum arquivo `.env` no frontend.
 
 ---
 
-### Firewall Notice
-
-If the app cannot connect to the backend, make sure your operating system's firewall allows incoming connections on **port 3000**. This is required for your phone to communicate with the server on your local network.

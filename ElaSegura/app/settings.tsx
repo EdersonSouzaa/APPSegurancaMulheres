@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   StatusBar,
   ScrollView,
   Switch,
-  Animated,
   ActivityIndicator,
   TextInput,
   Modal,
@@ -17,11 +16,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import * as Location from 'expo-location';
+import { BackHomeButton } from '../components/BackHomeButton';
 
 export default function Settings() {
   const router = useRouter();
@@ -36,8 +37,6 @@ export default function Settings() {
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [alertRadius, setAlertRadius] = useState(5000);
-
-
 
   // Alterar Senha
   const [currentPassword, setCurrentPassword] = useState('');
@@ -70,8 +69,6 @@ export default function Settings() {
         setIsLocationEnabled(userData.location_enabled);
         if (userData.alert_radius) setAlertRadius(userData.alert_radius);
       }
-
-
     } catch (error) {
       console.error('Erro ao carregar configurações do usuário:', error);
     }
@@ -138,8 +135,6 @@ export default function Settings() {
       Alert.alert('Erro', 'Não foi possível salvar o raio de alerta.');
     }
   };
-
-
 
   // Busca lista de contatos para a tela de segurança
   const fetchContacts = async () => {
@@ -226,21 +221,16 @@ export default function Settings() {
     }
   };
 
-
-
   // Se o usuário selecionou a sub-tela de Segurança
   if (currentSubScreen === 'security') {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'left', 'right']}>
-        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.headerBg} />
+        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.bg} />
 
         {/* Cabeçalho da sub-tela de Segurança */}
-        <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.backBtnBg }]}
-            onPress={() => setCurrentSubScreen('main')}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={28} color={colors.text} />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setCurrentSubScreen('main')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Segurança</Text>
         </View>
@@ -254,121 +244,133 @@ export default function Settings() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-
-
-
-          {/* Alterar Senha */}
-          <Section title="Alterar Senha">
-            <View style={styles.passwordForm}>
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.subtitle }]}>Senha Atual</Text>
-                <TextInput
-                  style={[styles.inputField, { backgroundColor: isDarkMode ? '#2D2D2D' : '#FAFAFA', color: colors.text, borderColor: colors.border }]}
-                  placeholder="Digite sua senha atual"
-                  placeholderTextColor={colors.subtitle}
-                  secureTextEntry
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.subtitle }]}>Nova Senha</Text>
-                <TextInput
-                  style={[styles.inputField, { backgroundColor: isDarkMode ? '#2D2D2D' : '#FAFAFA', color: colors.text, borderColor: colors.border }]}
-                  placeholder="Digite a nova senha"
-                  placeholderTextColor={colors.subtitle}
-                  secureTextEntry
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: colors.subtitle }]}>Confirmar Nova Senha</Text>
-                <TextInput
-                  style={[styles.inputField, { backgroundColor: isDarkMode ? '#2D2D2D' : '#FAFAFA', color: colors.text, borderColor: colors.border }]}
-                  placeholder="Confirme a nova senha"
-                  placeholderTextColor={colors.subtitle}
-                  secureTextEntry
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.savePasswordButton, { backgroundColor: colors.primary }]}
-                onPress={handleUpdatePassword}
-                disabled={passwordLoading}
-                activeOpacity={0.8}
-              >
-                {passwordLoading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Text style={styles.savePasswordButtonText}>Atualizar Senha</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </Section>
-
-          {/* Contatos SOS */}
-          <Section title="Contatos de Emergência SOS">
-            <Text style={[styles.sectionSubtitle, { color: colors.subtitle }]}>
-              Marque quais contatos receberão seus alertas imediatos de SOS e localização em tempo real.
-            </Text>
-
-            {contactsLoading ? (
-              <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 20 }} />
-            ) : contacts.length === 0 ? (
-              <View style={styles.emptyContactsContainer}>
-                <MaterialCommunityIcons name="account-multiple-outline" size={48} color={colors.subtitle} />
-                <Text style={[styles.emptyContactsText, { color: colors.subtitle }]}>
-                  Nenhum contato cadastrado ainda.
-                </Text>
-                <TouchableOpacity
-                  style={[styles.linkButton, { borderColor: colors.primary }]}
-                  onPress={() => {
-                    setCurrentSubScreen('main');
-                    router.push('/contatos');
-                  }}
-                >
-                  <Text style={[styles.linkButtonText, { color: colors.primary }]}>Cadastrar Contatos</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.contactsList}>
-                {contacts.map((item, index) => (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.contactItemRow,
-                      { borderBottomColor: colors.border },
-                      index === contacts.length - 1 && styles.lastItem
-                    ]}
-                  >
-                    <View style={[styles.contactIconBox, { backgroundColor: colors.iconBox }]}>
-                      <MaterialCommunityIcons
-                        name={item.emergencial ? "shield-alert" : "account"}
-                        size={24}
-                        color={item.emergencial ? colors.primary : colors.subtitle}
-                      />
-                    </View>
-                    <View style={styles.contactDetails}>
-                      <Text style={[styles.contactName, { color: colors.text }]}>{item.name}</Text>
-                      <Text style={[styles.contactPhone, { color: colors.subtitle }]}>{item.phone}</Text>
-                    </View>
-                    <Switch
-                      value={item.emergencial}
-                      onValueChange={() => handleToggleEmergencyStatus(item)}
-                      trackColor={{ false: '#D1D1D1', true: colors.primary }}
-                      thumbColor={'#FFF'}
+            {/* Alterar Senha */}
+            <Section title="Alterar Senha" colors={colors}>
+              <View style={styles.passwordForm}>
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Senha atual</Text>
+                  <View style={[styles.inputField, { backgroundColor: isDarkMode ? '#2D2D2D' : '#FAFAFA', borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="lock-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
+                    <TextInput
+                      style={[styles.inputFieldText, { color: colors.text }]}
+                      placeholder="Digite sua senha atual"
+                      placeholderTextColor={colors.subtitle}
+                      secureTextEntry
+                      value={currentPassword}
+                      onChangeText={setCurrentPassword}
                     />
                   </View>
-                ))}
-              </View>
-            )}
-          </Section>
+                </View>
 
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Nova senha</Text>
+                  <View style={[styles.inputField, { backgroundColor: isDarkMode ? '#2D2D2D' : '#FAFAFA', borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="lock-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
+                    <TextInput
+                      style={[styles.inputFieldText, { color: colors.text }]}
+                      placeholder="Digite a nova senha"
+                      placeholderTextColor={colors.subtitle}
+                      secureTextEntry
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Confirmar nova senha</Text>
+                  <View style={[styles.inputField, { backgroundColor: isDarkMode ? '#2D2D2D' : '#FAFAFA', borderColor: colors.border }]}>
+                    <MaterialCommunityIcons name="lock-check-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
+                    <TextInput
+                      style={[styles.inputFieldText, { color: colors.text }]}
+                      placeholder="Confirme a nova senha"
+                      placeholderTextColor={colors.subtitle}
+                      secureTextEntry
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.savePasswordButtonWrapper}
+                  onPress={handleUpdatePassword}
+                  disabled={passwordLoading}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={[colors.primary, '#C2185B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.savePasswordButton}
+                  >
+                    {passwordLoading ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.savePasswordButtonText}>Atualizar senha</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </Section>
+
+            {/* Contatos SOS */}
+            <Section title="Contatos de Emergência SOS" colors={colors}>
+              <Text style={[styles.sectionSubtitle, { color: colors.subtitle }]}>
+                Marque quais contatos receberão seus alertas imediatos de SOS e localização em tempo real.
+              </Text>
+
+              {contactsLoading ? (
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 20 }} />
+              ) : contacts.length === 0 ? (
+                <View style={styles.emptyContactsContainer}>
+                  <MaterialCommunityIcons name="account-multiple-outline" size={48} color={colors.subtitle} />
+                  <Text style={[styles.emptyContactsText, { color: colors.subtitle }]}>
+                    Nenhum contato cadastrado ainda.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.linkButton, { borderColor: colors.primary }]}
+                    onPress={() => {
+                      setCurrentSubScreen('main');
+                      router.push('/contatos');
+                    }}
+                  >
+                    <Text style={[styles.linkButtonText, { color: colors.primary }]}>Cadastrar Contatos</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.contactsList}>
+                  {contacts.map((item, index) => (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.contactItemRow,
+                        { borderBottomColor: colors.border },
+                        index === contacts.length - 1 && styles.lastItem
+                      ]}
+                    >
+                      <View style={[styles.contactIconBox, { backgroundColor: colors.tintPink }]}>
+                        <MaterialCommunityIcons
+                          name={item.emergencial ? "shield-alert" : "account"}
+                          size={22}
+                          color={item.emergencial ? colors.primary : colors.subtitle}
+                        />
+                      </View>
+                      <View style={styles.contactDetails}>
+                        <Text style={[styles.contactName, { color: colors.text }]}>{item.name}</Text>
+                        <Text style={[styles.contactPhone, { color: colors.subtitle }]}>{item.phone}</Text>
+                      </View>
+                      <Switch
+                        value={item.emergencial}
+                        onValueChange={() => handleToggleEmergencyStatus(item)}
+                        trackColor={{ false: colors.border, true: colors.primary }}
+                        thumbColor={'#FFF'}
+                      />
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Section>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -378,48 +380,48 @@ export default function Settings() {
   // Tela Principal de Configurações
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.headerBg} />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.bg} />
 
-      <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.backBtnBg }]}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={28} color={colors.text} />
-        </TouchableOpacity>
+      <View style={styles.header}>
+        <BackHomeButton />
         <Text style={[styles.headerTitle, { color: colors.text }]}>Configurações</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Section title="Conta">
+        <Section title="Segurança" colors={colors}>
           <SettingItem
+            colors={colors}
             icon="shield-lock-outline"
-            title="Segurança"
-            subtitle="Alterar senha e biometria"
+            iconColor={colors.primary}
+            iconTint={colors.tintPink}
+            title="Senha e biometria"
+            subtitle="Altere sua senha de acesso"
             onPress={() => {
               setCurrentSubScreen('security');
               fetchContacts();
             }}
-            isLast
           />
-        </Section>
-
-        <Section title="Segurança ElaSegura">
           <SettingItem
-            icon="account-group-outline"
-            title="Contatos de Emergência"
-            subtitle="Gerencie seus contatos SOS"
+            colors={colors}
+            icon="account-heart-outline"
+            iconColor="#7C4DFF"
+            iconTint={colors.tintPurple}
+            title="Contatos de emergência"
+            subtitle="Gerencie sua rede de confiança"
             onPress={() => router.push('/contatos')}
           />
           <SettingItem
+            colors={colors}
             icon="map-marker-radius-outline"
-            title="Localização em Tempo Real"
-            subtitle="Ativar compartilhamento de rota"
+            iconColor="#2196F3"
+            iconTint={colors.tintBlue}
+            title="Localização em tempo real"
+            subtitle="Atualiza sua posição ao vivo"
             rightElement={
               <Switch
                 value={isLocationEnabled}
                 onValueChange={handleToggleLocation}
-                trackColor={{ false: '#D1D1D1', true: colors.primary }}
+                trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor={'#FFF'}
               />
             }
@@ -427,31 +429,34 @@ export default function Settings() {
           />
         </Section>
 
-        <Section title="Preferências">
+        <Section title="Preferências" colors={colors}>
           <SettingItem
+            colors={colors}
             icon="bell-outline"
+            iconColor="#FF9800"
+            iconTint={colors.tintOrange}
             title="Notificações"
-            subtitle="Alertas e avisos sonoros"
+            subtitle="Alertas de risco por perto"
             rightElement={
               <Switch
                 value={isNotificationsEnabled}
                 onValueChange={handleToggleNotifications}
-                trackColor={{ false: '#D1D1D1', true: colors.primary }}
+                trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor={'#FFF'}
               />
             }
           />
-          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <View style={[styles.settingIconBox, { backgroundColor: colors.iconBox }]}>
-                <MaterialCommunityIcons name="map-marker-radius-outline" size={24} color={colors.primary} />
+          <View style={[styles.radiusRow, { borderTopColor: colors.border }]}>
+            <View style={styles.radiusHeaderRow}>
+              <View style={[styles.settingIconBox, { backgroundColor: colors.tintBlue }]}>
+                <MaterialCommunityIcons name="radar" size={22} color="#2196F3" />
               </View>
-              <View style={{ marginLeft: 16 }}>
-                <Text style={[styles.settingTitle, { color: colors.text }]}>Raio de Alertas</Text>
+              <View style={{ marginLeft: 14, flex: 1 }}>
+                <Text style={[styles.settingTitle, { color: colors.text }]}>Raio de alertas</Text>
                 <Text style={[styles.settingSubtitle, { color: colors.subtitle }]}>Distância para ocorrências próximas</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <View style={styles.radiusPillsRow}>
               {[
                 { label: '500m', value: 500 },
                 { label: '1km', value: 1000 },
@@ -462,14 +467,13 @@ export default function Settings() {
                 <TouchableOpacity
                   key={item.value}
                   onPress={() => handleChangeAlertRadius(item.value)}
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderRadius: 20,
-                    borderWidth: 1.5,
-                    borderColor: alertRadius === item.value ? colors.primary : colors.border,
-                    backgroundColor: alertRadius === item.value ? colors.primary : 'transparent',
-                  }}
+                  style={[
+                    styles.radiusPill,
+                    {
+                      borderColor: alertRadius === item.value ? colors.primary : colors.border,
+                      backgroundColor: alertRadius === item.value ? colors.primary : 'transparent',
+                    },
+                  ]}
                 >
                   <Text style={{ color: alertRadius === item.value ? '#FFF' : colors.subtitle, fontWeight: '600', fontSize: 13 }}>
                     {item.label}
@@ -480,50 +484,77 @@ export default function Settings() {
           </View>
         </Section>
 
-        <Section title="Temas">
+        <Section title="Aparência" colors={colors}>
           <SettingItem
-            icon="theme-light-dark"
-            title="Tema do Aplicativo"
-            subtitle={isDarkMode ? "Tema Escuro Ativado" : "Tema Padrão Original"}
-            rightElement={<MoonSwitch />}
+            colors={colors}
+            icon="moon-waning-crescent"
+            iconColor="#7C4DFF"
+            iconTint={colors.tintPurple}
+            title="Modo escuro"
+            subtitle="Alterna entre tema claro e escuro"
+            rightElement={
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleTheme}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={'#FFF'}
+              />
+            }
             isLast
           />
         </Section>
 
-        <Section title="Dicas e Utilidade Pública">
+        <Section title="Dicas e suporte" colors={colors}>
           <SettingItem
+            colors={colors}
             icon="lightbulb-on-outline"
-            title="Você Sabia?"
+            iconColor="#FFC107"
+            iconTint={colors.tintYellow}
+            title="Você sabia?"
             subtitle="Dicas, leis e contatos de apoio gratuito"
             onPress={() => setVocesabiaModalVisible(true)}
+          />
+          <SettingItem
+            colors={colors}
+            icon="help-circle-outline"
+            iconColor="#2196F3"
+            iconTint={colors.tintBlue}
+            title="Central de ajuda"
+            subtitle="Perguntas frequentes"
+            onPress={() => setFaqModalVisible(true)}
             isLast
           />
         </Section>
 
-        <Section title="Suporte">
+        <Section title="Sobre" colors={colors}>
           <SettingItem
-            icon="help-circle-outline"
-            title="Central de Ajuda"
-            onPress={() => setFaqModalVisible(true)}
+            colors={colors}
+            icon="shield-check-outline"
+            iconColor="#E91E63"
+            iconTint={colors.tintPink}
+            title="Privacidade e dados"
+            subtitle="Sobre o aplicativo ElaSegura"
+            onPress={() => router.push('/about')}
           />
           <SettingItem
+            colors={colors}
             icon="information-outline"
-            title="Sobre o App"
-            onPress={() => router.push('/about')}
+            iconColor="#2196F3"
+            iconTint={colors.tintBlue}
+            title="Versão do app"
+            rightElement={<Text style={[styles.settingValueText, { color: colors.subtitle }]}>1.0.0</Text>}
             isLast
           />
         </Section>
 
         <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.cardBg, borderColor: isDarkMode ? '#333' : '#FFDEDE' }]}
+          style={[styles.logoutButton, { backgroundColor: colors.tintPink }]}
           activeOpacity={0.8}
           onPress={() => router.replace('/login')}
         >
-          <MaterialCommunityIcons name="logout" size={24} color={colors.primary} />
-          <Text style={[styles.logoutText, { color: colors.primary }]}>Sair da Conta</Text>
+          <MaterialCommunityIcons name="logout" size={20} color={colors.primary} />
+          <Text style={[styles.logoutText, { color: colors.primary }]}>Sair da conta</Text>
         </TouchableOpacity>
-
-        <Text style={[styles.versionText, { color: colors.subtitle }]}>Versão 1.0.0</Text>
       </ScrollView>
 
       {/* Modal Central de Ajuda / FAQ */}
@@ -553,7 +584,7 @@ export default function Settings() {
               <View style={styles.faqItem}>
                 <Text style={[styles.faqQuestion, { color: colors.primary }]}>Como definir meus contatos de emergência?</Text>
                 <Text style={[styles.faqAnswer, { color: colors.text }]}>
-                  Acesse "Contatos de Emergência" no menu de configurações para cadastrar novos contatos de confiança. Depois, na aba "Segurança", você pode marcar quais deles ficarão ativos para receber os alertas de SOS.
+                  Acesse &ldquo;Contatos de emergência&rdquo; no menu de configurações para cadastrar novos contatos de confiança. Depois, na mesma seção, você pode marcar quais deles ficarão ativos para receber os alertas de SOS.
                 </Text>
               </View>
 
@@ -567,14 +598,14 @@ export default function Settings() {
               <View style={styles.faqItem}>
                 <Text style={[styles.faqQuestion, { color: colors.primary }]}>Minha localização é compartilhada o tempo todo?</Text>
                 <Text style={[styles.faqAnswer, { color: colors.text }]}>
-                  Não. Sua localização só é transmitida quando você ativa explicitamente o alerta de SOS na tela principal, ou quando ativa a opção "Localização em Tempo Real" em suas preferências.
+                  Não. Sua localização só é transmitida quando você ativa explicitamente o alerta de SOS na tela principal, ou quando ativa a opção &ldquo;Localização em tempo real&rdquo; em suas preferências.
                 </Text>
               </View>
 
               <View style={styles.faqItem}>
                 <Text style={[styles.faqQuestion, { color: colors.primary }]}>Como ativar o Tema Escuro?</Text>
                 <Text style={[styles.faqAnswer, { color: colors.text }]}>
-                  Basta clicar no botão de alternância do Sol/Lua na seção "Temas" da tela de configurações para alternar o visual do aplicativo a qualquer momento.
+                  Basta ativar a opção &ldquo;Modo escuro&rdquo; na seção &ldquo;Aparência&rdquo; da tela de configurações para alternar o visual do aplicativo a qualquer momento.
                 </Text>
               </View>
             </ScrollView>
@@ -669,20 +700,22 @@ export default function Settings() {
 const useSettingsColors = () => {
   const { isDarkMode } = useTheme();
   return {
-    bg: isDarkMode ? '#121212' : '#F7D2F1',
-    cardBg: isDarkMode ? '#1E1E1E' : '#FFF',
+    bg: isDarkMode ? '#121212' : '#FFECF4',
+    cardBg: isDarkMode ? '#1E1E1E' : '#FFFFFF',
     text: isDarkMode ? '#FFFFFF' : '#1A1A1A',
     subtitle: isDarkMode ? '#A0A0A0' : '#9C97AC',
     primary: '#F35F74',
     border: isDarkMode ? '#333333' : '#F0F0F0',
-    headerBg: isDarkMode ? '#121212' : '#F7D2F1',
-    iconBox: isDarkMode ? '#2D2D2D' : '#FFF5F6',
-    backBtnBg: isDarkMode ? '#2D2D2D' : '#FFF',
+    tintPink: isDarkMode ? '#F35F7433' : '#FFF0F2',
+    tintPurple: isDarkMode ? '#7C4DFF33' : '#EDE7F6',
+    tintBlue: isDarkMode ? '#2196F333' : '#E3F2FD',
+    tintOrange: isDarkMode ? '#FF980033' : '#FFF3E0',
+    tintYellow: isDarkMode ? '#FFC10733' : '#FFF8E1',
+    tintGreen: isDarkMode ? '#4CAF5033' : '#E8F5E9',
   };
 };
 
-const SettingItem = ({ icon, title, subtitle, onPress, isLast, rightElement }: any) => {
-  const colors = useSettingsColors();
+const SettingItem = ({ icon, iconColor, iconTint, title, subtitle, onPress, isLast, rightElement, colors }: any) => {
   return (
     <TouchableOpacity
       style={[
@@ -694,69 +727,28 @@ const SettingItem = ({ icon, title, subtitle, onPress, isLast, rightElement }: a
       activeOpacity={0.7}
       disabled={!onPress}
     >
-      <View style={[styles.settingIconBox, { backgroundColor: colors.iconBox }]}>
-        <MaterialCommunityIcons name={icon} size={24} color={colors.primary} />
+      <View style={[styles.settingIconBox, { backgroundColor: iconTint }]}>
+        <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
       </View>
       <View style={styles.settingTextContainer}>
         <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
         {subtitle && <Text style={[styles.settingSubtitle, { color: colors.subtitle }]}>{subtitle}</Text>}
       </View>
       {rightElement ? rightElement : (
-        onPress && <MaterialCommunityIcons name="chevron-right" size={24} color={colors.subtitle} />
+        onPress && <MaterialCommunityIcons name="chevron-right" size={22} color={colors.subtitle} />
       )}
     </TouchableOpacity>
   );
 };
 
-const Section = ({ title, children }: any) => {
-  const colors = useSettingsColors();
+const Section = ({ title, children, colors }: any) => {
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionHeader, { color: colors.primary }]}>{title}</Text>
+      <Text style={[styles.sectionHeader, { color: colors.subtitle }]}>{title.toUpperCase()}</Text>
       <View style={[styles.sectionContent, { backgroundColor: colors.cardBg }]}>
         {children}
       </View>
     </View>
-  );
-};
-
-const MoonSwitch = () => {
-  const { isDarkMode, toggleTheme } = useTheme();
-  const animatedValue = useRef(new Animated.Value(isDarkMode ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.timing(animatedValue, {
-      toValue: isDarkMode ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [isDarkMode]);
-
-  const translateX = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, 22],
-  });
-
-  const backgroundColor = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#D1D1D1', '#4D4D4D'],
-  });
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={toggleTheme}
-    >
-      <Animated.View style={[styles.customSwitchContainer, { backgroundColor }]}>
-        <Animated.View style={[styles.customSwitchThumb, { transform: [{ translateX }] }]}>
-          <MaterialCommunityIcons
-            name={isDarkMode ? "moon-waning-crescent" : "white-balance-sunny"}
-            size={16}
-            color={isDarkMode ? "#FFD700" : "#FFA500"}
-          />
-        </Animated.View>
-      </Animated.View>
-    </TouchableOpacity>
   );
 };
 
@@ -767,47 +759,38 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
     paddingHorizontal: 24,
-    paddingVertical: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    paddingTop: Platform.OS === 'android' ? 20 : 10,
+    paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: 'bold',
-    marginLeft: 16,
   },
   scrollContent: {
-    padding: 24,
-    paddingTop: 10,
+    padding: 20,
+    paddingTop: 6,
+    paddingBottom: 40,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 22,
   },
   sectionHeader: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 10,
+    marginLeft: 6,
+    letterSpacing: 0.5,
   },
   sectionContent: {
-    borderRadius: 24,
+    borderRadius: 22,
     overflow: 'hidden',
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   settingItem: {
     flexDirection: 'row',
@@ -819,23 +802,47 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   settingIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   settingTextContainer: {
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   settingSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 2,
+  },
+  settingValueText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  radiusRow: {
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  radiusHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  radiusPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  radiusPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
   logoutButton: {
     flexDirection: 'row',
@@ -844,38 +851,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 20,
     marginTop: 8,
-    marginBottom: 16,
-    borderWidth: 1,
+    gap: 8,
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  versionText: {
-    textAlign: 'center',
-    fontSize: 12,
-    marginBottom: 20,
-  },
-  customSwitchContainer: {
-    width: 50,
-    height: 28,
-    borderRadius: 15,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  customSwitchThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
   },
 
   // Estilos da Sub-tela de Segurança
@@ -891,23 +871,34 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputField: {
-    height: 48,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 16,
+  },
+  inputFieldIcon: {
+    marginRight: 10,
+  },
+  inputFieldText: {
+    flex: 1,
     fontSize: 15,
   },
-  savePasswordButton: {
-    height: 48,
+  savePasswordButtonWrapper: {
     borderRadius: 24,
+    overflow: 'hidden',
+    marginTop: 8,
+    elevation: 3,
+    shadowColor: '#F35F74',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  savePasswordButton: {
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
   },
   savePasswordButtonText: {
     color: '#FFF',
@@ -954,19 +945,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   contactIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   contactDetails: {
     flex: 1,
   },
   contactName: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   contactPhone: {
     fontSize: 13,

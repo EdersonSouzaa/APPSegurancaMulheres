@@ -1,19 +1,19 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StatusBar, 
-  FlatList, 
-  Modal, 
-  TextInput, 
-  Alert, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  Modal,
+  TextInput,
+  Alert,
   ActivityIndicator,
   Switch,
-  ScrollView
+  ScrollView,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/contatos.styles';
 import { router } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
@@ -21,6 +21,7 @@ import { Colors } from '../constants/theme';
 import { api } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ToastNotification } from '../components/ToastNotification';
+import { BackHomeButton } from '../components/BackHomeButton';
 
 interface Contato {
   id: number;
@@ -29,13 +30,24 @@ interface Contato {
   emergencial: boolean;
 }
 
+const CONTACT_COLORS = ['#F5A623', '#7C4DFF', '#2196F3', '#26A69A', '#EC407A', '#5C6BC0'];
+
+const DELEGACIA_CONTATO = {
+  id: -1,
+  name: 'Delegacia da Mulher',
+  phone: '180',
+  subtitle: '180 · Central de Atendimento',
+};
+
 export default function Contatos() {
   const { isDarkMode, theme } = useTheme();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
-  const [contatos, setContatos] = useState<Contato[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [contatos, setContatos] = useState<Contato[]>([
+    { id: 1, name: 'Mãe', phone: '+55 11 98888-1020', emergencial: true },
+  ]);
+  const [loading, setLoading] = useState(false as any);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingContato, setEditingContato] = useState<Contato | null>(null);
   const [name, setName] = useState('');
@@ -60,11 +72,8 @@ export default function Contatos() {
     }
   };
 
-  const contatosEmergenciais = contatos.filter(c => c.emergencial);
-  const contatosNormais = contatos.filter(c => !c.emergencial);
-
   useEffect(() => {
-    fetchContatos();
+    // fetchContatos();
   }, []);
 
   const fetchContatos = async () => {
@@ -111,13 +120,14 @@ export default function Contatos() {
       'Deseja realmente excluir este contato?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Excluir', 
+        {
+          text: 'Excluir',
           style: 'destructive',
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('userToken');
               await api.delete(`/contatos/${id}`, token || undefined);
+              setModalVisible(false);
               showToast('Contato excluído com sucesso! 🗑️', 'danger');
               fetchContatos();
             } catch (error: any) {
@@ -144,23 +154,13 @@ export default function Contatos() {
     setEmergencial(false);
   };
 
-  const renderContato = ({ item }: { item: Contato }) => (
-    <View style={styles.contactItem}>
-      <MaterialIcons name="person" size={40} color={item.emergencial ? '#FF5252' : colors.primary} />
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName}>{item.name}</Text>
-        <Text style={styles.contactPhone}>{item.phone}</Text>
-      </View>
-      <View style={styles.contactActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-          <MaterialIcons name="edit" size={24} color={colors.secondary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => handleDelete(item.id)}>
-          <MaterialIcons name="delete" size={24} color="#FF5252" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const callContact = async (phoneNumber: string, contactName: string) => {
+    try {
+      await Linking.openURL(`tel:${phoneNumber}`);
+    } catch {
+      Alert.alert('Não foi possível ligar', `Tente ligar manualmente para ${contactName} (${phoneNumber}).`);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -168,26 +168,23 @@ export default function Contatos() {
 
       {/* Cabeçalho */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={28} color={colors.text} />
+        <BackHomeButton />
+        <Text style={styles.headerTitle}>Contatos</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          activeOpacity={0.8}
+          onPress={() => {
+            resetForm();
+            setModalVisible(true);
+          }}
+        >
+          <MaterialIcons name="add" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <View>
-          <Text style={styles.headerTitle}>Contatos de Confiança</Text>
-          <Text style={styles.headerSubtitle}>Escolha contatos de confiança 💜</Text>
-        </View>
       </View>
 
-      {/* Botão Adicionar */}
-      <TouchableOpacity 
-        style={styles.addButton} 
-        activeOpacity={0.8}
-        onPress={() => {
-          resetForm();
-          setModalVisible(true);
-        }}
-      >
-        <Text style={styles.addButtonText}>+ Adicionar contato</Text>
-      </TouchableOpacity>
+      <Text style={styles.headerSubtitle}>
+        Essas pessoas serão avisadas na hora quando você acionar o SOS.
+      </Text>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
@@ -199,43 +196,50 @@ export default function Contatos() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          
-          {/* Seção Emergenciais */}
-          {contatosEmergenciais.length > 0 && (
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 12 }}>
-                <MaterialIcons name="warning" size={24} color="#FF5252" />
-                <Text style={{ color: '#FF5252', fontWeight: 'bold', marginLeft: 8, fontSize: 18 }}>
-                  Contatos Emergenciais
-                </Text>
+          {contatos.map((item, index) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.contactItem}
+              activeOpacity={0.8}
+              onPress={() => openEditModal(item)}
+            >
+              <View style={[styles.contactAvatar, { backgroundColor: CONTACT_COLORS[index % CONTACT_COLORS.length] }]}>
+                <Text style={styles.contactAvatarText}>{item.name.charAt(0).toUpperCase()}</Text>
               </View>
-              {contatosEmergenciais.map(item => (
-                <View key={item.id}>
-                  {renderContato({ item })}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Seção Contatos Normais */}
-          {contatosNormais.length > 0 && (
-            <View>
-              {contatosEmergenciais.length > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 20 }}>
-                  <MaterialIcons name="people" size={24} color={colors.text} />
-                  <Text style={{ color: colors.text, fontWeight: 'bold', marginLeft: 8, fontSize: 18 }}>
-                    Outros Contatos
-                  </Text>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.contactPhone}>{item.phone}</Text>
+              </View>
+              {item.emergencial && (
+                <View style={styles.principalBadge}>
+                  <Text style={styles.principalBadgeText}>PRINCIPAL</Text>
                 </View>
               )}
-              {contatosNormais.map(item => (
-                <View key={item.id}>
-                  {renderContato({ item })}
-                </View>
-              ))}
-            </View>
-          )}
+              <TouchableOpacity
+                style={styles.callButton}
+                onPress={(e) => { e.stopPropagation(); callContact(item.phone, item.name); }}
+              >
+                <MaterialIcons name="call" size={18} color="#2E7D32" />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
 
+          {/* Contato fixo de emergência pública */}
+          <View style={styles.contactItem}>
+            <View style={[styles.contactAvatar, { backgroundColor: colors.primary }]}>
+              <MaterialCommunityIcons name="shield-alert" size={20} color="#FFF" />
+            </View>
+            <View style={styles.contactInfo}>
+              <Text style={styles.contactName} numberOfLines={1}>{DELEGACIA_CONTATO.name}</Text>
+              <Text style={styles.contactPhone}>{DELEGACIA_CONTATO.subtitle}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.callButton}
+              onPress={() => callContact(DELEGACIA_CONTATO.phone, DELEGACIA_CONTATO.name)}
+            >
+              <MaterialIcons name="call" size={18} color="#2E7D32" />
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
 
@@ -251,49 +255,62 @@ export default function Contatos() {
             <Text style={styles.modalTitle}>
               {editingContato ? 'Editar Contato' : 'Novo Contato'}
             </Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Nome do contato"
-              placeholderTextColor={colors.secondary}
-              value={name}
-              onChangeText={setName}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Telefone"
-              placeholderTextColor={colors.secondary}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <Text style={{ color: colors.text, fontSize: 15 }}>Contato emergencial</Text>
+            <View style={styles.inputField}>
+              <MaterialCommunityIcons name="account-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
+              <TextInput
+                style={styles.inputFieldText}
+                placeholder="Nome do contato"
+                placeholderTextColor={colors.secondary}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+
+            <View style={styles.inputField}>
+              <MaterialCommunityIcons name="phone-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
+              <TextInput
+                style={styles.inputFieldText}
+                placeholder="Telefone"
+                placeholderTextColor={colors.secondary}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Contato principal (SOS)</Text>
               <Switch
                 value={emergencial}
                 onValueChange={setEmergencial}
-                trackColor={{ false: '#ccc', true: '#FF5252' }}
-                thumbColor={emergencial ? '#fff' : '#fff'}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={'#FFF'}
               />
             </View>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancelar</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleSave}
               >
                 <Text style={[styles.buttonText, styles.saveButtonText]}>Salvar</Text>
               </TouchableOpacity>
             </View>
+
+            {editingContato && (
+              <TouchableOpacity style={styles.deleteLink} onPress={() => handleDelete(editingContato.id)}>
+                <MaterialIcons name="delete-outline" size={18} color="#E53935" />
+                <Text style={styles.deleteLinkText}>Excluir contato</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>

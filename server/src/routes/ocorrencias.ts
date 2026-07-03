@@ -56,6 +56,66 @@ router.post('/', authenticateToken, async (req: any, res: Response) => {
   }
 });
 
+// Update Ocorrencia — só o dono pode editar
+router.put('/:id', authenticateToken, async (req: any, res: Response) => {
+  const userId = req.user.id;
+  const ocorrenciaId = Number(req.params.id);
+  const { title, description, type } = req.body;
+
+  if (!Number.isInteger(ocorrenciaId)) {
+    return res.status(400).json({ error: 'Invalid ocorrencia id' });
+  }
+  if (!title || !description) {
+    return res.status(400).json({ error: 'Title and description are required' });
+  }
+  if (type !== undefined && !isValidType(type)) {
+    return res.status(400).json({ error: "Type must be 'error' or 'warning'" });
+  }
+
+  try {
+    const result = await query(
+      `UPDATE "ocorrencia" SET title = $1, description = $2, type = $3
+       WHERE id = $4 AND user_id = $5 RETURNING *`,
+      [title, description, type ?? 'error', ocorrenciaId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ocorrencia not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating ocorrencia:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete Ocorrencia — só o dono pode excluir
+router.delete('/:id', authenticateToken, async (req: any, res: Response) => {
+  const userId = req.user.id;
+  const ocorrenciaId = Number(req.params.id);
+
+  if (!Number.isInteger(ocorrenciaId)) {
+    return res.status(400).json({ error: 'Invalid ocorrencia id' });
+  }
+
+  try {
+    const result = await query(
+      `DELETE FROM "ocorrencia" WHERE id = $1 AND user_id = $2 RETURNING *`,
+      [ocorrenciaId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ocorrencia not found' });
+    }
+
+    res.json({ message: 'Ocorrencia deleted successfully', data: result.rows[0] });
+  } catch (error) {
+    console.error('Error deleting ocorrencia:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // List all Ocorrencias — community feed for the "Gerais" tab
 router.get('/', authenticateToken, async (req: any, res: Response) => {
   const filter = req.query.filter as string | undefined;

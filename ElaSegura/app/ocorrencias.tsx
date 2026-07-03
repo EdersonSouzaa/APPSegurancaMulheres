@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { api } from '../services/api';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,11 +17,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { Colors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { getStyles } from '../styles/ocorrencias.styles';
 import { ToastNotification } from '../components/ToastNotification';
+import { BackHomeButton } from '../components/BackHomeButton';
+import { SuccessPopup } from '../components/SuccessPopup';
 
 type OccurrenceType = 'error' | 'warning';
 type TabType = 'gerais' | 'proximas';
@@ -31,6 +34,8 @@ type Occurrence = {
   time: string;
   type: OccurrenceType;
   distance: number;
+  /** true quando o registro existe no servidor (foi criado com sucesso via API) */
+  synced?: boolean;
 };
 
 const initialOccurrences: Occurrence[] = [];
@@ -56,10 +61,14 @@ export default function Ocorrencias() {
   const [distance, setDistance] = useState<number>(500);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todos');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'danger'>('success');
+
+  const [editSuccessVisible, setEditSuccessVisible] = useState(false);
 
   const showToast = async (message: string, type: 'success' | 'danger') => {
     try {
@@ -140,12 +149,29 @@ const filteredOccurrences = useMemo(() => {
     setDescription('');
     setType('error');
     setDistance(500);
-    setSelectedCategory(''); 
+    setSelectedCategory('');
+    setEditingId(null);
   };
 
   const closeModal = () => {
     setModalVisible(false);
     resetForm();
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setModalVisible(true);
+  };
+
+  const openEditModal = (item: Occurrence) => {
+    const knownCategories = ['Assédio', 'Roubo', 'Suspeita'];
+    setEditingId(item.id);
+    setTitle(item.title);
+    setDescription(item.desc);
+    setType(item.type);
+    setDistance(item.distance);
+    setSelectedCategory(knownCategories.includes(item.title) ? item.title : 'Outro');
+    setModalVisible(true);
   };
 
   const formatOccurrenceTime = () => {
@@ -158,50 +184,115 @@ const filteredOccurrences = useMemo(() => {
     return `${date}, ${time}`;
   };
 
-  const handleRegisterOccurrence = async () => {
-    if (!canSave) return;
-
-    let lat: number | null = null;
-    let lng: number | null = null;
+  const handleSubmitOccurrence = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
 
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const lastKnown = await Location.getLastKnownPositionAsync({});
-        const loc = lastKnown ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        lat = loc.coords.latitude;
-        lng = loc.coords.longitude;
+      const token = await AsyncStorage.getItem('userToken');
+
+      if (editingId != null) {
+        // --- Editar ocorrência existente ---
+        const current = occurrences.find((o) => o.id === editingId);
+        if (!current) return;
+
+        if (current.synced && token) {
+          await api.put(
+            `/ocorrencias/${editingId}`,
+            { title: title.trim(), description: description.trim(), type },
+            token
+          );
+        }
+
+        const updated = occurrences.map((o) =>
+          o.id === editingId
+            ? { ...o, title: title.trim(), desc: description.trim(), type, distance }
+            : o
+        );
+        setOccurrences(updated);
+        saveOccurrences(updated);
+        closeModal();
+        setEditSuccessVisible(true);
+      } else {
+        // --- Registrar nova ocorrência ---
+        let lat: number | null = null;
+        let lng: number | null = null;
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const lastKnown = await Location.getLastKnownPositionAsync({});
+            const loc = lastKnown ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            lat = loc.coords.latitude;
+            lng = loc.coords.longitude;
+          }
+        } catch {}
+
+        let serverId: number | null = null;
+        if (token) {
+          try {
+            const created = await api.post(
+              '/ocorrencias',
+              { title: title.trim(), description: description.trim(), type, latitude: lat, longitude: lng },
+              token
+            );
+            serverId = created?.id ?? null;
+          } catch (err) {
+            console.error('Erro ao salvar ocorrência na API:', err);
+          }
+        }
+
+        const newOccurrence: Occurrence = {
+          id: serverId ?? -Date.now(),
+          title: title.trim(),
+          desc: description.trim(),
+          time: formatOccurrenceTime(),
+          type,
+          distance,
+          synced: serverId != null,
+        };
+
+        const updatedOccurrences = [newOccurrence, ...occurrences];
+        setOccurrences(updatedOccurrences);
+        saveOccurrences(updatedOccurrences);
+        showToast('Ocorrência registrada com sucesso! ⚠️', 'success');
+
+        setCategoryFilter('Todos');
+        setActiveTab('gerais');
+        closeModal();
       }
-    } catch {}
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível salvar a ocorrência.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    const newOccurrence: Occurrence = {
-      id: Date.now(),
-      title: title.trim(),
-      desc: description.trim(),
-      time: formatOccurrenceTime(),
-      type,
-      distance,
-    };
-
-    const updatedOccurrences = [newOccurrence, ...occurrences];
-    setOccurrences(updatedOccurrences);
-    saveOccurrences(updatedOccurrences);
-    showToast('Ocorrência registrada com sucesso! ⚠️', 'success');
-
-    AsyncStorage.getItem('userToken').then(token => {
-      if (!token) return;
-      api.post('/ocorrencias', {
-        title: title.trim(),
-        description: description.trim(),
-        type,
-        latitude: lat,
-        longitude: lng,
-      }, token).catch(err => console.error('Erro ao salvar ocorrência na API:', err));
-    });
-
-    setCategoryFilter('Todos');
-    setActiveTab('gerais');
-    closeModal();
+  const handleDeleteOccurrence = (item: Occurrence) => {
+    Alert.alert(
+      'Excluir ocorrência',
+      'Tem certeza que deseja excluir esta ocorrência? Essa ação não pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (item.synced) {
+                const token = await AsyncStorage.getItem('userToken');
+                if (token) await api.delete(`/ocorrencias/${item.id}`, token);
+              }
+              const updated = occurrences.filter((o) => o.id !== item.id);
+              setOccurrences(updated);
+              saveOccurrences(updated);
+              showToast('Ocorrência excluída com sucesso!', 'success');
+            } catch (e: any) {
+              Alert.alert('Erro', e?.message ?? 'Não foi possível excluir a ocorrência.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const FilterChip = ({ label, value }: { label: string; value: number }) => (
@@ -223,9 +314,7 @@ const filteredOccurrences = useMemo(() => {
       />
 
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={28} color={colors.text} />
-        </TouchableOpacity>
+        <BackHomeButton style={{ marginRight: 15 }} />
 
         <View>
           <Text style={styles.headerTitle}>Ocorrencias</Text>
@@ -290,7 +379,7 @@ const filteredOccurrences = useMemo(() => {
         <TouchableOpacity
           style={styles.registerButton}
           activeOpacity={0.8}
-          onPress={() => setModalVisible(true)}
+          onPress={openCreateModal}
         >
           <MaterialIcons name="add-alert" size={24} color="#FFF" />
           <Text style={styles.registerButtonText}>Nova ocorrencia</Text>
@@ -310,15 +399,13 @@ const filteredOccurrences = useMemo(() => {
               </View>
 
               <View style={styles.occurrenceInfo}>
-                <View style={styles.occurrenceTopRow}>
-                  <Text style={styles.occurrenceTitle}>{item.title}</Text>
-                  <Text style={styles.occurrenceDate}>{item.time.split(',')[0]}</Text>
-                </View>
+                <Text style={styles.occurrenceTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
 
                 <Text style={styles.occurrenceDescription} numberOfLines={2}>
                   {item.desc}
                 </Text>
-                <Text style={styles.occurrenceTime}>{item.time}</Text>
 
                 <View style={styles.distanceBadge}>
                   <MaterialCommunityIcons
@@ -326,12 +413,40 @@ const filteredOccurrences = useMemo(() => {
                     size={12}
                     color={colors.primary}
                   />
-                  <Text style={styles.distanceText}>
+                  <Text style={styles.distanceText} numberOfLines={1}>
                     {item.distance >= 1000
                       ? `${(item.distance / 1000).toFixed(1)}km`
                       : `${item.distance}m`}{' '}
                     de distancia
                   </Text>
+                </View>
+
+                <View style={styles.occurrenceBottomRow}>
+                  <View style={styles.occurrenceTimeRow}>
+                    <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
+                    <Text style={styles.occurrenceTime} numberOfLines={1}>
+                      {item.time}
+                    </Text>
+                  </View>
+
+                  <View style={styles.occurrenceActionsRow}>
+                    <TouchableOpacity
+                      style={styles.cardActionButton}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      onPress={() => openEditModal(item)}
+                    >
+                      <MaterialCommunityIcons name="pencil-outline" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.cardActionButton, styles.cardActionButtonDanger]}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      onPress={() => handleDeleteOccurrence(item)}
+                    >
+                      <MaterialCommunityIcons name="trash-can-outline" size={20} color="#E53935" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             </View>
@@ -361,8 +476,10 @@ const filteredOccurrences = useMemo(() => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Registrar ocorrencia</Text>
-                <Text style={styles.modalSubtitle}>Informe o que aconteceu</Text>
+                <Text style={styles.modalTitle}>{editingId != null ? 'Editar ocorrência' : 'Registrar ocorrencia'}</Text>
+                <Text style={styles.modalSubtitle}>
+                  {editingId != null ? 'Atualize as informações abaixo' : 'Informe o que aconteceu'}
+                </Text>
               </View>
 
               <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
@@ -466,13 +583,21 @@ const filteredOccurrences = useMemo(() => {
             />
 
             <TouchableOpacity
-              style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+              style={[styles.saveButton, (!canSave || saving) && styles.saveButtonDisabled]}
               activeOpacity={0.85}
-              onPress={handleRegisterOccurrence}
-              disabled={!canSave}
+              onPress={handleSubmitOccurrence}
+              disabled={!canSave || saving}
             >
-              <MaterialIcons name="check-circle" size={24} color="#FFF" />
-              <Text style={styles.saveButtonText}>Salvar ocorrencia</Text>
+              {saving ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <MaterialIcons name="check-circle" size={24} color="#FFF" />
+                  <Text style={styles.saveButtonText}>
+                    {editingId != null ? 'Salvar alterações' : 'Salvar ocorrencia'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -483,6 +608,13 @@ const filteredOccurrences = useMemo(() => {
         message={toastMessage}
         type={toastType}
         onClose={() => setToastVisible(false)}
+      />
+
+      <SuccessPopup
+        visible={editSuccessVisible}
+        onContinue={() => setEditSuccessVisible(false)}
+        title="Ocorrência atualizada!"
+        message="As alterações foram salvas com sucesso."
       />
     </SafeAreaView>
   );

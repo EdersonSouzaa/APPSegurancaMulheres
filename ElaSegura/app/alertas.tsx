@@ -1,17 +1,16 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { View, Text, StatusBar, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { getStyles } from '../styles/alertas.styles';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import { BackHomeButton } from '../components/BackHomeButton';
 
 const AlertasScreen = () => {
-  const router = useRouter();
   const { isDarkMode, theme } = useTheme();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
@@ -54,9 +53,7 @@ const AlertasScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <MaterialIcons name="arrow-back" size={28} color={colors.text} />
-          </TouchableOpacity>
+          <BackHomeButton style={{ marginRight: 15 }} />
           <Text style={styles.title}>Alertas</Text>
         </View>
         <Text style={styles.subtitle}>Histórico de alertas e ocorrências</Text>

@@ -84,10 +84,65 @@ const buildHtml = (isDarkMode: boolean, interactive: boolean) => `<!DOCTYPE html
     box-shadow: 0 2px 6px rgba(0,122,255,0.6);
   }
   .incident-pin {
-    width: 24px; height: 24px; border-radius: 50% 50% 50% 0;
+    width: 26px; height: 26px; border-radius: 50% 50% 50% 0;
     transform: rotate(-45deg);
     border: 2px solid #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.35);
+    position: relative;
+  }
+  .incident-pin::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .incident-triangle {
+    width: 0; height: 0;
+    border-left: 13px solid transparent;
+    border-right: 13px solid transparent;
+    border-bottom: 22px solid #FB8C00;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+    position: relative;
+  }
+  .incident-triangle::after {
+    content: '!';
+    position: absolute;
+    top: 9px; left: -3.5px;
+    width: 7px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    font-family: sans-serif;
+    text-align: center;
+  }
+  .you-are-here {
+    background: #fff;
+    color: #1A1A1A;
+    font-weight: 700;
+    font-size: 12px;
+    font-family: sans-serif;
+    padding: 5px 10px;
+    border-radius: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    border: none !important;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .you-are-here::before {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #007AFF;
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .leaflet-tooltip.you-are-here-tip::before { display: none; }
+  .risk-glow-pane path {
+    filter: blur(7px);
   }
 </style>
 </head>
@@ -108,6 +163,12 @@ const buildHtml = (isDarkMode: boolean, interactive: boolean) => `<!DOCTYPE html
     tap: __interactive,
   }).setView([-3.7319, -38.5267], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+  // Pane com blur aplicado só nas zonas de risco — dá o efeito "heatmap" suave (glow) em vez de círculos duros.
+  const glowPane = map.createPane('riskGlowPane');
+  glowPane.classList.add('risk-glow-pane');
+  glowPane.style.zIndex = 410;
+  const riskRenderer = L.svg({ pane: 'riskGlowPane' });
 
   let userPulseMarker = null;
   let userDotMarker = null;
@@ -141,6 +202,12 @@ const buildHtml = (isDarkMode: boolean, interactive: boolean) => `<!DOCTYPE html
     if (!userPulseMarker) {
       userPulseMarker = L.marker(latlng, { icon: pulseIcon, interactive: false }).addTo(map);
       userDotMarker = L.marker(latlng, { icon: dotIcon, interactive: false }).addTo(map);
+      userDotMarker.bindTooltip('Você está aqui', {
+        permanent: true,
+        direction: 'top',
+        offset: [0, -6],
+        className: 'you-are-here you-are-here-tip',
+      }).openTooltip();
     } else {
       userPulseMarker.setLatLng(latlng);
       userDotMarker.setLatLng(latlng);
@@ -156,15 +223,30 @@ const buildHtml = (isDarkMode: boolean, interactive: boolean) => `<!DOCTYPE html
     riskLayer.clearLayers();
     zones.forEach(z => {
       const dim = activeFilter && activeFilter !== z.level;
-      const opacity = dim ? 0.10 : 0.35;
-      const strokeOpacity = dim ? 0.3 : 1.0;
+      const opacity = dim ? 0.08 : 0.4;
+      // Halo externo (bem suave, blur forte) + núcleo (blur leve) — dá o efeito de mancha de calor da referência.
+      L.circle([z.lat, z.lng], {
+        radius: z.radius * 1.5,
+        renderer: riskRenderer,
+        stroke: false,
+        fillColor: z.color,
+        fillOpacity: opacity * 0.5,
+      }).addTo(riskLayer);
       L.circle([z.lat, z.lng], {
         radius: z.radius,
-        color: z.color,
-        weight: 2,
-        opacity: strokeOpacity,
+        renderer: riskRenderer,
+        stroke: false,
         fillColor: z.color,
         fillOpacity: opacity,
+      }).addTo(riskLayer);
+      // Aro nítido por cima (sem blur), fino, só pra dar referência do centro/label ao tocar.
+      L.circle([z.lat, z.lng], {
+        radius: z.radius * 0.15,
+        color: z.color,
+        weight: 1,
+        opacity: dim ? 0.25 : 0.7,
+        fillColor: z.color,
+        fillOpacity: 0,
       }).bindPopup('<b>' + (z.label || 'Area') + '</b>').addTo(riskLayer);
     });
   }
@@ -173,12 +255,10 @@ const buildHtml = (isDarkMode: boolean, interactive: boolean) => `<!DOCTYPE html
     incidentsLayer.clearLayers();
     if (!visible) return;
     items.forEach(it => {
-      const color = it.type === 'error' ? '#E53935' : '#FB8C00';
-      const icon = L.divIcon({
-        className: '',
-        html: '<div class="incident-pin" style="background:' + color + ';"></div>',
-        iconSize: [24, 24], iconAnchor: [12, 24]
-      });
+      const isWarning = it.type === 'warning';
+      const icon = isWarning
+        ? L.divIcon({ className: '', html: '<div class="incident-triangle"></div>', iconSize: [26, 22], iconAnchor: [13, 20] })
+        : L.divIcon({ className: '', html: '<div class="incident-pin" style="background:#E53935;"></div>', iconSize: [26, 26], iconAnchor: [13, 26] });
       L.marker([it.lat, it.lng], { icon }).bindPopup('<b>' + (it.title || 'Ocorrencia') + '</b>').addTo(incidentsLayer);
     });
   }

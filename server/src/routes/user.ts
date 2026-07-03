@@ -11,7 +11,7 @@ router.get('/me', authenticateToken, async (req: any, res: Response) => {
 
   try {
     const result = await query(
-      'SELECT id, name, email, profile_picture, notifications_enabled, location_enabled, alert_radius FROM "user" WHERE id = $1',
+      'SELECT id, name, email, profile_picture, notifications_enabled, location_enabled, alert_radius, created_at FROM "user" WHERE id = $1',
       [userId]
     );
 

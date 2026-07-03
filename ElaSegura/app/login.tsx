@@ -10,61 +10,117 @@ import {
   Platform,
   Modal,
   Image,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { api } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
 import { SuccessPopup } from '../components/SuccessPopup';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 
 const MULHER_IMAGE = require('../assets/images/mulher.png');
 
+type AuthTab = 'login' | 'cadastro';
+
 export default function Login() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const { isDarkMode, theme } = useTheme();
+
+  const [activeTab, setActiveTab] = useState<AuthTab>(params.tab === 'cadastro' ? 'cadastro' : 'login');
+
+  // Login state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  // Cadastro state
+  const [name, setName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [registerError, setRegisterError] = useState('');
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
+
+  // Recuperar senha
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
+  const switchTab = (tab: AuthTab) => {
+    setActiveTab(tab);
+    setLoginError('');
+    setRegisterError('');
+  };
+
   const handleLogin = async () => {
-    setErrorMessage('');
-    
+    setLoginError('');
+
     if (!email || !password) {
-      setErrorMessage('Preencha todos os campos');
+      setLoginError('Preencha todos os campos');
       return;
     }
 
-    // Validação REGEX do E-mail
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setErrorMessage('Digite um e-mail válido (ex: seuemail@dominio.com)');
+      setLoginError('Digite um e-mail válido (ex: seuemail@dominio.com)');
       return;
     }
 
     try {
       const response = await api.post('/auth/login', { email, password });
-      
+
       await AsyncStorage.setItem('user', JSON.stringify(response.user));
       await AsyncStorage.setItem('userToken', response.token);
-      await AsyncStorage.setItem('userPassword', password); 
-      
-      console.log('Login realizado:', response);
+      await AsyncStorage.setItem('userPassword', password);
+
       router.replace('/home');
     } catch (error: any) {
-      setErrorMessage('E-mail ou senha incorretos');
+      setLoginError('E-mail ou senha incorretos');
+    }
+  };
+
+  const handleRegister = async () => {
+    setRegisterError('');
+
+    if (!name || !registerEmail || !registerPassword || !confirmPassword) {
+      setRegisterError('Preencha todos os campos');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(registerEmail)) {
+      setRegisterError('Digite um e-mail válido (ex: seuemail@dominio.com)');
+      return;
+    }
+
+    if (registerPassword.length < 6 || registerPassword.length > 20) {
+      setRegisterError('A senha precisa ter entre 6 e 20 caracteres');
+      return;
+    }
+
+    if (registerPassword !== confirmPassword) {
+      setRegisterError('As senhas não coincidem');
+      return;
+    }
+
+    try {
+      await api.post('/auth/register', { name, email: registerEmail, password: registerPassword });
+      setIsPopupVisible(true);
+    } catch (error: any) {
+      Alert.alert('Erro no Cadastro', error.message);
     }
   };
 
@@ -85,7 +141,6 @@ export default function Login() {
       return;
     }
 
-    // Validação de Tamanho da Nova Senha
     if (newPassword.length < 6 || newPassword.length > 20) {
       Alert.alert('Erro', 'A nova senha precisa ter entre 6 e 20 caracteres.');
       return;
@@ -102,82 +157,212 @@ export default function Login() {
     }
   };
 
+  const isLogin = activeTab === 'login';
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      
-      <SuccessPopup 
-        visible={isSuccessVisible} 
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+
+      <SuccessPopup
+        visible={isSuccessVisible}
         title="Senha Alterada!"
         message="Sua nova senha já está valendo. Agora é só entrar!"
-        onContinue={() => setIsSuccessVisible(false)} 
+        onContinue={() => setIsSuccessVisible(false)}
       />
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <View style={styles.content}>
+      <SuccessPopup
+        visible={isPopupVisible}
+        title="Cadastro realizado!"
+        message="Sua conta foi criada com sucesso. Agora é só entrar."
+        onContinue={() => {
+          setIsPopupVisible(false);
+          switchTab('login');
+        }}
+      />
+
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Image source={MULHER_IMAGE} style={[styles.brandImage, isDarkMode && { tintColor: colors.primary }]} resizeMode="contain" />
-            <Text style={styles.brandTitle}>ElaSegura</Text>
-            <Text style={styles.brandSubtitle}>Sua segurança é importante 💜</Text>
+            <View style={styles.logoBadge}>
+              <Image source={MULHER_IMAGE} style={styles.logoImage} resizeMode="contain" />
+            </View>
+            <Text style={styles.title}>{isLogin ? 'Bem-vinda de volta' : 'Crie sua conta'}</Text>
+            <Text style={styles.subtitle}>
+              {isLogin
+                ? 'Entre para manter sua rede de proteção sempre ativa.'
+                : 'Cadastre-se para começar a usar sua rede de proteção.'}
+            </Text>
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="email-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="E-mail"
-                placeholderTextColor={colors.secondary}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
+          <View style={styles.tabSwitcher}>
+            <TouchableOpacity
+              style={[styles.tabButton, isLogin && styles.tabButtonActive]}
+              onPress={() => switchTab('login')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabButtonText, isLogin && styles.tabButtonTextActive]}>Entrar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabButton, !isLogin && styles.tabButtonActive]}
+              onPress={() => switchTab('cadastro')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabButtonText, !isLogin && styles.tabButtonTextActive]}>Cadastrar</Text>
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="lock-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Senha"
-                placeholderTextColor={colors.secondary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <MaterialCommunityIcons 
-                  name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                  size={24} 
-                  color={colors.secondary} 
+          {isLogin ? (
+            <View style={styles.form}>
+              <Text style={styles.label}>E-mail</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="email-outline" size={20} color={colors.primary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="seuemail@email.com"
+                  placeholderTextColor={colors.secondary}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                 />
+              </View>
+
+              <Text style={styles.label}>Senha</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="lock-outline" size={20} color={colors.primary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.secondary}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <MaterialCommunityIcons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.secondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
+
+              <TouchableOpacity style={styles.forgotPassword} onPress={() => setIsModalVisible(true)}>
+                <Text style={styles.forgotPasswordText}>Esqueci minha senha</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.primaryButtonWrapper} onPress={handleLogin} activeOpacity={0.85}>
+                <LinearGradient
+                  colors={[colors.primary, '#C2185B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.primaryButton}
+                >
+                  <Text style={styles.primaryButtonText}>Entrar →</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>ou continue com</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <TouchableOpacity
+                style={styles.biometricButton}
+                activeOpacity={0.8}
+                onPress={() => Alert.alert('Biometria', 'Login por biometria em breve.')}
+              >
+                <MaterialCommunityIcons name="fingerprint" size={20} color={colors.primary} />
+                <Text style={styles.biometricButtonText}>Entrar com biometria</Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            <View style={styles.form}>
+              <Text style={styles.label}>Nome completo</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="account-outline" size={20} color={colors.primary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Seu nome completo"
+                  placeholderTextColor={colors.secondary}
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                />
+              </View>
 
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+              <Text style={styles.label}>E-mail</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="email-outline" size={20} color={colors.primary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="seuemail@email.com"
+                  placeholderTextColor={colors.secondary}
+                  value={registerEmail}
+                  onChangeText={setRegisterEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
 
-            <TouchableOpacity 
-              style={styles.forgotPassword} 
-              onPress={() => setIsModalVisible(true)}
-            >
-              <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
-            </TouchableOpacity>
+              <Text style={styles.label}>Senha</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="lock-outline" size={20} color={colors.primary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.secondary}
+                  value={registerPassword}
+                  onChangeText={setRegisterPassword}
+                  secureTextEntry={!showRegisterPassword}
+                />
+                <TouchableOpacity onPress={() => setShowRegisterPassword(!showRegisterPassword)}>
+                  <MaterialCommunityIcons
+                    name={showRegisterPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.secondary}
+                  />
+                </TouchableOpacity>
+              </View>
 
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin} activeOpacity={0.8}>
-              <Text style={styles.loginButtonText}>Entrar</Text>
-            </TouchableOpacity>
-          </View>
+              <Text style={styles.label}>Confirmar senha</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="lock-check-outline" size={20} color={colors.primary} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.secondary}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showRegisterPassword}
+                />
+              </View>
+
+              {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
+
+              <TouchableOpacity style={[styles.primaryButtonWrapper, { marginTop: 8 }]} onPress={handleRegister} activeOpacity={0.85}>
+                <LinearGradient
+                  colors={[colors.primary, '#C2185B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.primaryButton}
+                >
+                  <Text style={styles.primaryButtonText}>Cadastrar →</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Ainda não tem uma conta? </Text>
-            <TouchableOpacity onPress={() => router.push('/')}>
-              <Text style={styles.footerLink}>Registre-se</Text>
+            <Text style={styles.footerText}>{isLogin ? 'Não tem conta? ' : 'Já tem conta? '}</Text>
+            <TouchableOpacity onPress={() => switchTab(isLogin ? 'cadastro' : 'login')}>
+              <Text style={styles.footerLink}>{isLogin ? 'Cadastre-se' : 'Entrar'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Modal de Recuperar Senha */}
@@ -195,7 +380,7 @@ export default function Login() {
                 <MaterialCommunityIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.modalDescription}>
               Digite sua nova senha abaixo para atualizar seu acesso.
             </Text>
@@ -211,10 +396,10 @@ export default function Login() {
                 secureTextEntry={!showNewPassword}
               />
               <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
-                <MaterialCommunityIcons 
-                  name={showNewPassword ? "eye-off-outline" : "eye-outline"}
+                <MaterialCommunityIcons
+                  name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={24}
-                  color={colors.secondary} 
+                  color={colors.secondary}
                 />
               </TouchableOpacity>
             </View>
@@ -231,11 +416,7 @@ export default function Login() {
               />
             </View>
 
-            <TouchableOpacity 
-              style={styles.modalButton} 
-              onPress={handleRecoverPassword}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={styles.modalButton} onPress={handleRecoverPassword} activeOpacity={0.8}>
               <Text style={styles.modalButtonText}>Redefinir Senha</Text>
             </TouchableOpacity>
           </View>
@@ -253,94 +434,175 @@ const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     padding: 24,
-    justifyContent: 'center',
+    paddingBottom: 32,
   },
   header: {
+    marginBottom: 24,
+    marginTop: 12,
+  },
+  logoBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
     alignItems: 'center',
-    marginBottom: 40,
+    justifyContent: 'center',
+    marginBottom: 18,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
-  brandImage: {
-    width: 150,
-    height: 150,
-    marginBottom: 10,
+  logoImage: {
+    width: 40,
+    height: 40,
   },
-  brandTitle: {
-    fontSize: 32,
+  title: {
+    fontSize: 26,
     fontWeight: 'bold',
-    color: isDarkMode ? colors.primary : '#FF1493',
-    marginBottom: 5,
-  },
-  brandSubtitle: {
-    fontSize: 16,
     color: colors.text,
-    fontWeight: '500',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.secondary,
+    lineHeight: 20,
+  },
+  tabSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: isDarkMode ? '#252525' : '#F2E3EA',
+    borderRadius: 16,
+    padding: 4,
+    marginBottom: 24,
+  },
+  tabButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: colors.cardBackground,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  tabButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.secondary,
+  },
+  tabButtonTextActive: {
+    color: colors.primary,
   },
   form: {
-    backgroundColor: colors.cardBackground,
-    padding: 24,
-    borderRadius: 30,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: isDarkMode ? '#252525' : '#F8F8F8',
-    borderRadius: 16,
+    borderRadius: 14,
     marginBottom: 16,
     paddingHorizontal: 16,
-    height: 56,
+    height: 52,
     borderWidth: 1,
     borderColor: colors.border,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: 10,
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.text,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   forgotPasswordText: {
     color: colors.primary,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
-  loginButton: {
-    backgroundColor: colors.primary,
+  primaryButtonWrapper: {
     borderRadius: 16,
-    height: 56,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  primaryButton: {
+    height: 54,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 3,
   },
-  loginButtonText: {
+  primaryButtonText: {
     color: '#FFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 22,
+    marginBottom: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 12,
+    color: colors.secondary,
+  },
+  biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.cardBackground,
+  },
+  biometricButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 30,
+    marginTop: 28,
   },
   footerText: {
     color: colors.secondary,
-    fontSize: 15,
+    fontSize: 14,
   },
   footerLink: {
     color: colors.primary,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   modalOverlay: {
@@ -404,7 +666,7 @@ const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   },
   errorText: {
     color: '#FF0000',
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
     marginBottom: 10,
     fontWeight: '600',

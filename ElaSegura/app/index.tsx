@@ -1,275 +1,201 @@
-import React, { useState, useMemo } from 'react';
-import { SuccessPopup } from '../components/SuccessPopup';
-import { api } from '../services/api';
-import { Alert } from 'react-native';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   Image,
+  ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
-import { Colors } from '../constants/theme';
 
 const MULHER_IMAGE = require('../assets/images/mulher.png');
 
-export default function Index() {
+const SLIDES = [
+  {
+    image: MULHER_IMAGE,
+    title: 'Sua segurança,\nnossa prioridade',
+    description: 'Alertas de emergência, mapa colaborativo e sua rede de confiança — tudo em um só lugar, sempre com você.',
+  },
+  {
+    image: MULHER_IMAGE,
+    title: 'SOS em\num toque',
+    description: 'Ative o alerta de emergência e avise sua rede de confiança na hora, com sua localização em tempo real.',
+  },
+  {
+    image: MULHER_IMAGE,
+    title: 'Mapa\ncolaborativo',
+    description: 'Veja áreas de risco reportadas pela comunidade e trace rotas mais seguras para chegar aonde precisa.',
+  },
+];
+
+export default function Welcome() {
   const router = useRouter();
-  const { isDarkMode, theme } = useTheme();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const { isDarkMode } = useTheme();
+  const { width } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const styles = useMemo(() => getStyles(), []);
 
-  const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const gradientColors = isDarkMode
+    ? (['#3D0F2C', '#1A0512'] as const)
+    : (['#FF4F8E', '#B0134A'] as const);
 
-  const colors = Colors[theme];
-  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
-
-  const handleRegister = async () => {
-    setErrorMessage('');
-    
-    // 1. Verifica se tem campo vazio
-    if (!name || !email || !password || !confirmPassword) {
-      setErrorMessage('Preencha todos os campos');
-      return;
-    }
-
-    // 2. Validação REGEX do E-mail
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setErrorMessage('Digite um e-mail válido (ex: seuemail@dominio.com)');
-      return;
-    }
-
-    // 3. Validação de Tamanho da Senha
-    if (password.length < 6 || password.length > 20) {
-      setErrorMessage('A senha precisa ter entre 6 e 20 caracteres');
-      return;
-    }
-
-    // 4. Verifica se as senhas batem
-    if (password !== confirmPassword) {
-      setErrorMessage('As senhas não coincidem');
-      return;
-    }
-
-    try {
-      await api.post('/auth/register', { name, email, password });
-      setIsPopupVisible(true);
-    } catch (error: any) {
-      Alert.alert('Erro no Cadastro', error.message);
-    }
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+    setActiveIndex(newIndex);
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
-      
-      <SuccessPopup 
-        visible={isPopupVisible} 
-        onContinue={() => {
-          setIsPopupVisible(false);
-          router.replace('/login');
-        }} 
-      />
+    <LinearGradient colors={gradientColors} style={styles.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <Image source={MULHER_IMAGE} style={[styles.brandImage, isDarkMode && { tintColor: colors.primary }]} resizeMode="contain" />
-            <Text style={styles.brandTitle}>ElaSegura</Text>
-            <Text style={styles.brandSubtitle}>Sua segurança é importante 💜</Text>
+        <View style={styles.content}>
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            style={styles.scrollView}
+          >
+            {SLIDES.map((slide, index) => (
+              <View key={index} style={[styles.slide, { width }]}>
+                <View style={styles.illustrationBox}>
+                  <Image source={slide.image} style={styles.illustrationImage} resizeMode="contain" />
+                </View>
+
+                <Text style={styles.title}>{slide.title}</Text>
+                <Text style={styles.description}>{slide.description}</Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.dots}>
+            {SLIDES.map((_, index) => (
+              <View key={index} style={[styles.dot, index === activeIndex && styles.dotActive]} />
+            ))}
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="account-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Nome Completo"
-                placeholderTextColor={colors.secondary}
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-              />
-            </View>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/login', params: { tab: 'cadastro' } })}
+          >
+            <Text style={styles.primaryButtonText}>Começar →</Text>
+          </TouchableOpacity>
 
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="email-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="E-mail"
-                placeholderTextColor={colors.secondary}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="lock-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Senha"
-                placeholderTextColor={colors.secondary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <MaterialCommunityIcons 
-                  name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                  size={24} 
-                  color={colors.secondary} 
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <MaterialCommunityIcons name="lock-check-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirmar Senha"
-                placeholderTextColor={colors.secondary}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showPassword}
-              />
-            </View>
-
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-            <TouchableOpacity style={styles.registerButton} onPress={handleRegister} activeOpacity={0.8}>
-              <Text style={styles.registerButtonText}>Cadastrar</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Já tem uma conta? </Text>
-            <TouchableOpacity onPress={() => router.push('/login')}>
-              <Text style={styles.footerLink}>Entrar</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <TouchableOpacity
+            style={styles.secondaryLink}
+            activeOpacity={0.7}
+            onPress={() => router.push({ pathname: '/login', params: { tab: 'login' } })}
+          >
+            <Text style={styles.secondaryLinkText}>Já tenho uma conta</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
-const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
+const getStyles = () => StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  keyboardView: {
+  content: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
+    paddingBottom: 24,
     justifyContent: 'center',
   },
-  header: {
+  scrollView: {
+    flexGrow: 0,
+  },
+  slide: {
+    paddingHorizontal: 28,
+    alignItems: 'flex-start',
+  },
+  illustrationBox: {
+    alignSelf: 'center',
+    width: 220,
+    height: 220,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
-    marginBottom: 30,
-    marginTop: 20,
-    position: 'relative',
+    justifyContent: 'center',
+    marginBottom: 28,
   },
-  brandImage: {
-    width: 120,
-    height: 120,
-    marginBottom: 10,
+  illustrationImage: {
+    width: 150,
+    height: 150,
   },
-  brandTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: isDarkMode ? colors.primary : '#FF1493',
-    marginBottom: 5,
-  },
-  brandSubtitle: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  form: {
-    backgroundColor: colors.cardBackground,
-    padding: 24,
-    borderRadius: 30,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-  },
-  inputContainer: {
+  dots: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: isDarkMode ? '#252525' : '#F8F8F8',
-    borderRadius: 16,
+    alignSelf: 'center',
+    marginBottom: 32,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    marginHorizontal: 4,
+  },
+  dotActive: {
+    width: 22,
+    backgroundColor: '#FFFFFF',
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    lineHeight: 40,
     marginBottom: 16,
-    paddingHorizontal: 16,
-    height: 56,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  inputIcon: {
-    marginRight: 12,
+  description: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 22,
   },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-  },
-  registerButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    height: 56,
-    justifyContent: 'center',
+  primaryButton: {
+    marginHorizontal: 28,
+    backgroundColor: '#FFFFFF',
+    height: 58,
+    borderRadius: 18,
     alignItems: 'center',
-    marginTop: 10,
-    elevation: 3,
-  },
-  registerButtonText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  footer: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 30,
-    marginBottom: 20,
+    marginTop: 20,
+    marginBottom: 18,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
-  footerText: {
-    color: colors.secondary,
-    fontSize: 15,
-  },
-  footerLink: {
-    color: colors.primary,
-    fontSize: 15,
+  primaryButtonText: {
+    color: '#C2185B',
+    fontSize: 17,
     fontWeight: 'bold',
   },
-  errorText: {
-    color: '#FF0000',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 10,
+  secondaryLink: {
+    alignSelf: 'center',
+  },
+  secondaryLinkText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

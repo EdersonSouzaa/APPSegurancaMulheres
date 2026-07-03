@@ -8,13 +8,21 @@ interface SuccessPopupProps {
   onContinue: () => void;
   title?: string;
   message?: string;
+  /** Nome do ícone do MaterialIcons exibido no círculo. Padrão: "check". */
+  icon?: keyof typeof MaterialIcons.glyphMap;
+  /** Cor do círculo do ícone e da sombra. Padrão: rosa da marca. */
+  accentColor?: string;
+  continueLabel?: string;
 }
 
-export const SuccessPopup = ({ 
-  visible, 
-  onContinue, 
-  title = "Sucesso!", 
-  message = "Ação realizada com sucesso!" 
+export const SuccessPopup = ({
+  visible,
+  onContinue,
+  title = "Sucesso!",
+  message = "Ação realizada com sucesso!",
+  icon = "check",
+  accentColor = "#F35F74",
+  continueLabel = "Continuar",
 }: SuccessPopupProps) => {
   return (
     <Modal
@@ -26,20 +34,20 @@ export const SuccessPopup = ({
       <BlurView intensity={20} style={styles.overlay}>
         <View style={styles.card}>
           <View style={styles.iconContainer}>
-            <View style={styles.iconCircle}>
-              <MaterialIcons name="check" size={50} color="#FFF" />
+            <View style={[styles.iconCircle, { backgroundColor: accentColor, shadowColor: accentColor }]}>
+              <MaterialIcons name={icon} size={50} color="#FFF" />
             </View>
           </View>
-          
+
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-          
-          <TouchableOpacity 
-            style={styles.button} 
-            onPress={onContinue} 
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={onContinue}
             activeOpacity={0.8}
           >
-            <Text style={styles.buttonText}>Continuar</Text>
+            <Text style={styles.buttonText}>{continueLabel}</Text>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -76,11 +84,9 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F35F74',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
-    shadowColor: '#F35F74',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.4,
     shadowRadius: 10,

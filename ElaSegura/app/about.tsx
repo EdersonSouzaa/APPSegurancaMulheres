@@ -1,9 +1,7 @@
 import React from 'react';
-import { useRouter } from 'expo-router';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   StatusBar,
   ScrollView,
@@ -13,18 +11,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
 import { Colors } from '@/constants/theme';
+import { BackHomeButton } from '@/components/BackHomeButton';
 
 // Cores movidas para dentro do componente ou usando o tema central
 
 export default function About() {
-  const router = useRouter();
   const { isDarkMode, theme } = useTheme();
 
   // Cores dinâmicas para esta tela
   const colors = {
     primary: '#F06292',
     secondary: isDarkMode ? '#A0A0A0' : '#9C97AC',
-    background: isDarkMode ? '#121212' : '#FDEAF9',
+    background: isDarkMode ? '#121212' : '#FFECF4',
     card: isDarkMode ? '#1E1E1E' : '#FFFFFF',
     text: isDarkMode ? '#FFFFFF' : '#212121',
     purple: '#9575CD',
@@ -53,16 +51,10 @@ export default function About() {
 
       {/* Navbar fixa no topo */}
       <View style={styles.navbar}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          activeOpacity={0.7}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="chevron-left" size={28} color={colors.text} />
-        </TouchableOpacity>
+        <BackHomeButton />
         <Text style={styles.navbarTitle}>Sobre o App</Text>
         {/* View vazia apenas para centralizar o título perfeitamente */}
-        <View style={{ width: 40 }} />
+        <View style={{ width: 42 }} />
       </View>
 
       <ScrollView
@@ -136,19 +128,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   scrollContent: {
     paddingHorizontal: 20,

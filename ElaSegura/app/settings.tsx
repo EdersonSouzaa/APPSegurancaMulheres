@@ -383,7 +383,7 @@ export default function Settings() {
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.bg} />
 
       <View style={styles.header}>
-        <BackHomeButton />
+        <BackHomeButton to="/perfil" />
         <Text style={[styles.headerTitle, { color: colors.text }]}>Configurações</Text>
       </View>
 
@@ -525,36 +525,6 @@ export default function Settings() {
             isLast
           />
         </Section>
-
-        <Section title="Sobre" colors={colors}>
-          <SettingItem
-            colors={colors}
-            icon="shield-check-outline"
-            iconColor="#E91E63"
-            iconTint={colors.tintPink}
-            title="Privacidade e dados"
-            subtitle="Sobre o aplicativo ElaSegura"
-            onPress={() => router.push('/about')}
-          />
-          <SettingItem
-            colors={colors}
-            icon="information-outline"
-            iconColor="#2196F3"
-            iconTint={colors.tintBlue}
-            title="Versão do app"
-            rightElement={<Text style={[styles.settingValueText, { color: colors.subtitle }]}>1.0.0</Text>}
-            isLast
-          />
-        </Section>
-
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.tintPink }]}
-          activeOpacity={0.8}
-          onPress={() => router.replace('/login')}
-        >
-          <MaterialCommunityIcons name="logout" size={20} color={colors.primary} />
-          <Text style={[styles.logoutText, { color: colors.primary }]}>Sair da conta</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Modal Central de Ajuda / FAQ */}
@@ -820,10 +790,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  settingValueText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   radiusRow: {
     padding: 16,
     borderTopWidth: 1,
@@ -844,20 +810,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
   },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 20,
-    marginTop: 8,
-    gap: 8,
-  },
-  logoutText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-
   // Estilos da Sub-tela de Segurança
   passwordForm: {
     padding: 20,

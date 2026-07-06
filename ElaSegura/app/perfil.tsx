@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/perfil.styles';
 import { router } from 'expo-router';
@@ -254,22 +255,29 @@ export default function Perfil() {
             icon="help-circle-outline"
             iconColor="#FF9800"
             iconTint={isDarkMode ? '#FF980033' : '#FFF3E0'}
-            title="Ajuda e suporte"
-            subtitle="Central de dúvidas e contato"
+            title="Sobre o App"
+            subtitle="Objetivo e finalidade do app"
             onPress={() => router.push('/about')}
           />
         </View>
 
         <TouchableOpacity
-          style={styles.logoutButton}
-          activeOpacity={0.8}
+          style={styles.logoutButtonWrapper}
+          activeOpacity={0.85}
           onPress={async () => {
             await AsyncStorage.multiRemove(['userToken', 'user']);
             router.replace('/login');
           }}
         >
-          <MaterialCommunityIcons name="logout" size={20} color={colors.primary} />
-          <Text style={styles.logoutText}>Sair da conta</Text>
+          <LinearGradient
+            colors={[colors.primary, '#C2185B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.logoutButton}
+          >
+            <MaterialCommunityIcons name="logout" size={20} color="#FFFFFF" />
+            <Text style={styles.logoutText}>Sair da conta</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />

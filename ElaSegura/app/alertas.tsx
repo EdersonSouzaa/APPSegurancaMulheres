@@ -53,7 +53,7 @@ const AlertasScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <BackHomeButton style={{ marginRight: 15 }} />
+          <BackHomeButton style={{ marginRight: 15 }} to="/perfil" />
           <Text style={styles.title}>Alertas</Text>
         </View>
         <Text style={styles.subtitle}>Histórico de alertas e ocorrências</Text>

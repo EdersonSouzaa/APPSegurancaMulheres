@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,31 +6,38 @@ import {
   StyleSheet,
   StatusBar,
   Image,
-  ScrollView,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
+  Animated,
+  PanResponder,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../context/ThemeContext';
+import { Colors, ThemeColors } from '../constants/theme';
 
-const MULHER_IMAGE = require('../assets/images/mulher.png');
+const MULHER_IMAGE = require('../assets/images/logo.png');
 
 const SLIDES = [
   {
     image: MULHER_IMAGE,
+    icon: 'shield-check' as const,
+    kicker: 'Bem-vinda',
     title: 'Sua segurança,\nnossa prioridade',
     description: 'Alertas de emergência, mapa colaborativo e sua rede de confiança — tudo em um só lugar, sempre com você.',
   },
   {
     image: MULHER_IMAGE,
+    icon: 'alarm-light' as const,
+    kicker: 'Emergência',
     title: 'SOS em\num toque',
     description: 'Ative o alerta de emergência e avise sua rede de confiança na hora, com sua localização em tempo real.',
   },
   {
     image: MULHER_IMAGE,
+    icon: 'map-marker-radius' as const,
+    kicker: 'Comunidade',
     title: 'Mapa\ncolaborativo',
     description: 'Veja áreas de risco reportadas pela comunidade e trace rotas mais seguras para chegar aonde precisa.',
   },
@@ -38,59 +45,90 @@ const SLIDES = [
 
 export default function Welcome() {
   const router = useRouter();
-  const { isDarkMode } = useTheme();
+  const { theme, isDarkMode } = useTheme();
+  const colors = Colors[theme];
   const { width } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
-  const styles = useMemo(() => getStyles(), []);
+  const illustrationSize = Math.min(width * 0.85, 420);
+  const styles = useMemo(() => getStyles(illustrationSize, colors), [illustrationSize, colors]);
+
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
+
+  const goToSlide = (nextIndex: number) => {
+    if (nextIndex === activeIndexRef.current || nextIndex < 0 || nextIndex >= SLIDES.length) return;
+    Animated.timing(fadeAnim, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
+      setActiveIndex(nextIndex);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx < -40) {
+          goToSlide(activeIndexRef.current + 1);
+        } else if (gesture.dx > 40) {
+          goToSlide(activeIndexRef.current - 1);
+        }
+      },
+    })
+  ).current;
 
   const gradientColors = isDarkMode
-    ? (['#3D0F2C', '#1A0512'] as const)
-    : (['#FF4F8E', '#B0134A'] as const);
+    ? (['#121212', '#1E1E1E'] as const)
+    : (['#FFFFFF', '#FFECF4'] as const);
 
-  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-    setActiveIndex(newIndex);
-  };
+  const slide = SLIDES[activeIndex];
 
   return (
     <LinearGradient colors={gradientColors} style={styles.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
         <View style={styles.content}>
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleMomentumScrollEnd}
-            style={styles.scrollView}
-          >
-            {SLIDES.map((slide, index) => (
-              <View key={index} style={[styles.slide, { width }]}>
-                <View style={styles.illustrationBox}>
-                  <Image source={slide.image} style={styles.illustrationImage} resizeMode="contain" />
-                </View>
+          <Animated.View style={[styles.slide, { opacity: fadeAnim }]} {...panResponder.panHandlers}>
+            <View style={styles.illustrationBox}>
+              <Image source={slide.image} style={styles.illustrationImage} resizeMode="contain" />
+            </View>
 
-                <Text style={styles.title}>{slide.title}</Text>
-                <Text style={styles.description}>{slide.description}</Text>
-              </View>
-            ))}
-          </ScrollView>
+            <View style={styles.kickerPill}>
+              <MaterialCommunityIcons name={slide.icon} size={15} color={colors.primary} />
+              <Text style={styles.kickerText}>{slide.kicker}</Text>
+            </View>
+
+            <Text style={styles.title}>{slide.title}</Text>
+            <Text style={styles.description}>{slide.description}</Text>
+          </Animated.View>
 
           <View style={styles.dots}>
             {SLIDES.map((_, index) => (
-              <View key={index} style={[styles.dot, index === activeIndex && styles.dotActive]} />
+              <TouchableOpacity
+                key={index}
+                onPress={() => goToSlide(index)}
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              >
+                <View style={[styles.dot, index === activeIndex && styles.dotActive]} />
+              </TouchableOpacity>
             ))}
           </View>
 
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={styles.primaryButtonWrapper}
             activeOpacity={0.85}
             onPress={() => router.push({ pathname: '/login', params: { tab: 'cadastro' } })}
           >
-            <Text style={styles.primaryButtonText}>Começar →</Text>
+            <LinearGradient
+              colors={[colors.primary, '#C2185B']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.primaryButton}
+            >
+              <Text style={styles.primaryButtonText}>Começar →</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -106,7 +144,7 @@ export default function Welcome() {
   );
 }
 
-const getStyles = () => StyleSheet.create({
+const getStyles = (illustrationSize: number, colors: ThemeColors) => StyleSheet.create({
   gradient: {
     flex: 1,
   },
@@ -118,65 +156,72 @@ const getStyles = () => StyleSheet.create({
     paddingBottom: 24,
     justifyContent: 'center',
   },
-  scrollView: {
-    flexGrow: 0,
-  },
   slide: {
     paddingHorizontal: 28,
     alignItems: 'flex-start',
   },
   illustrationBox: {
     alignSelf: 'center',
-    width: 220,
-    height: 220,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    width: illustrationSize,
+    height: illustrationSize,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   illustrationImage: {
-    width: 150,
-    height: 150,
+    width: illustrationSize,
+    height: illustrationSize,
+  },
+  kickerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+  kickerText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   dots: {
     flexDirection: 'row',
     alignSelf: 'center',
+    marginTop: 24,
     marginBottom: 32,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: colors.border,
     marginHorizontal: 4,
   },
   dotActive: {
     width: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.primary,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: colors.text,
     lineHeight: 40,
     marginBottom: 16,
+    letterSpacing: 0.2,
   },
   description: {
     fontSize: 15,
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.secondary,
     lineHeight: 22,
   },
-  primaryButton: {
+  primaryButtonWrapper: {
     marginHorizontal: 28,
-    backgroundColor: '#FFFFFF',
-    height: 58,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 20,
     marginBottom: 18,
     elevation: 4,
@@ -185,8 +230,14 @@ const getStyles = () => StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
+  primaryButton: {
+    height: 58,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   primaryButtonText: {
-    color: '#C2185B',
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: 'bold',
   },
@@ -194,7 +245,7 @@ const getStyles = () => StyleSheet.create({
     alignSelf: 'center',
   },
   secondaryLinkText: {
-    color: '#FFFFFF',
+    color: colors.primary,
     fontSize: 15,
     fontWeight: '600',
   },

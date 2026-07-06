@@ -16,10 +16,15 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
   headerButton: {
     width: 42,
     height: 42,
-    borderRadius: 21,
-    backgroundColor: isDarkMode ? colors.accent : '#FFF0F2',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   headerTitleRow: {
     flexDirection: 'row',
@@ -165,21 +170,28 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     color: colors.secondary,
   },
 
+  logoutButtonWrapper: {
+    marginHorizontal: 20,
+    marginTop: 28,
+    borderRadius: 18,
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
   logoutButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: isDarkMode ? colors.accent : '#FFEBEF',
-    marginHorizontal: 20,
-    marginTop: 24,
-    borderRadius: 20,
+    borderRadius: 18,
     paddingVertical: 16,
-    gap: 8,
+    gap: 10,
   },
   logoutText: {
-    color: colors.primary,
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 
   // Modal "Informações pessoais"

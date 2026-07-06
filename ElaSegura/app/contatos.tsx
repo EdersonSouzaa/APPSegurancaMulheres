@@ -168,7 +168,7 @@ export default function Contatos() {
 
       {/* Cabeçalho */}
       <View style={styles.header}>
-        <BackHomeButton />
+        <BackHomeButton to="/perfil" />
         <Text style={styles.headerTitle}>Contatos</Text>
         <TouchableOpacity
           style={styles.addButton}

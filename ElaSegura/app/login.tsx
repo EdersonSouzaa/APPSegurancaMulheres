@@ -12,6 +12,7 @@ import {
   Image,
   ScrollView,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -23,7 +24,7 @@ import { SuccessPopup } from '../components/SuccessPopup';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 
-const MULHER_IMAGE = require('../assets/images/mulher.png');
+const LOGO_IMAGE = require('../assets/images/logo.png');
 
 type AuthTab = 'login' | 'cadastro';
 
@@ -57,7 +58,9 @@ export default function Login() {
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
 
   const colors = Colors[theme];
-  const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+  const { width } = useWindowDimensions();
+  const logoSize = Math.min(width * 0.32, 140);
+  const styles = useMemo(() => getStyles(isDarkMode, colors, logoSize), [isDarkMode, colors, logoSize]);
 
   const switchTab = (tab: AuthTab) => {
     setActiveTab(tab);
@@ -184,7 +187,7 @@ export default function Login() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <View style={styles.logoBadge}>
-              <Image source={MULHER_IMAGE} style={styles.logoImage} resizeMode="contain" />
+              <Image source={LOGO_IMAGE} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={styles.title}>{isLogin ? 'Bem-vinda de volta' : 'Crie sua conta'}</Text>
             <Text style={styles.subtitle}>
@@ -262,21 +265,6 @@ export default function Login() {
                 >
                   <Text style={styles.primaryButtonText}>Entrar →</Text>
                 </LinearGradient>
-              </TouchableOpacity>
-
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>ou continue com</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <TouchableOpacity
-                style={styles.biometricButton}
-                activeOpacity={0.8}
-                onPress={() => Alert.alert('Biometria', 'Login por biometria em breve.')}
-              >
-                <MaterialCommunityIcons name="fingerprint" size={20} color={colors.primary} />
-                <Text style={styles.biometricButtonText}>Entrar com biometria</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -426,7 +414,7 @@ export default function Login() {
   );
 }
 
-const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
+const getStyles = (isDarkMode: boolean, colors: any, logoSize: number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -444,23 +432,16 @@ const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
     marginTop: 12,
   },
   logoBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
+    alignSelf: 'center',
+    width: logoSize,
+    height: logoSize,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    marginBottom: 12,
   },
   logoImage: {
-    width: 40,
-    height: 40,
+    width: logoSize,
+    height: logoSize,
   },
   title: {
     fontSize: 26,
@@ -558,38 +539,6 @@ const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 22,
-    marginBottom: 18,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    marginHorizontal: 12,
-    fontSize: 12,
-    color: colors.secondary,
-  },
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.cardBackground,
-  },
-  biometricButtonText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   footer: {
     flexDirection: 'row',

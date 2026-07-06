@@ -6,17 +6,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 type Props = {
   style?: StyleProp<ViewStyle>;
   size?: number;
+  to?: string;
 };
 
-/** Botão fixo (quadrado branco, seta vermelha) para voltar direto à tela inicial de qualquer tela do app. */
-export function BackHomeButton({ style, size = 22 }: Props) {
+/** Botão fixo (quadrado branco, seta vermelha) para voltar direto à tela inicial (ou a `to`, se informado) de qualquer tela do app. */
+export function BackHomeButton({ style, size = 22, to = '/home' }: Props) {
   const router = useRouter();
 
   return (
     <TouchableOpacity
       style={[styles.button, style]}
       activeOpacity={0.75}
-      onPress={() => router.replace('/home')}
+      onPress={() => router.replace(to as any)}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
       <MaterialCommunityIcons name="arrow-left" size={size} color="#E53935" />

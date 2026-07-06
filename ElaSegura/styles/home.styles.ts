@@ -78,14 +78,29 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     fontWeight: 'bold',
   },
   headerGreeting: {
-    fontSize: 14,
+    fontSize: 19,
+    fontWeight: '600',
     color: colors.secondary,
-    marginBottom: 2,
+    letterSpacing: 0.2,
   },
   headerName: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
     color: colors.text,
+  },
+  headerSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  headerSubtitleText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.secondary,
+    letterSpacing: 0.1,
+  },
+  headerSubtitleIcon: {
+    marginLeft: 5,
   },
   scrollView: {
     flex: 1,
@@ -96,60 +111,21 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     paddingBottom: 100,
   },
 
-  // Card de status "Você está Protegida"
+  // Card de status com preview do mapa
   statusCard: {
-    borderRadius: 30,
-    padding: 22,
+    borderRadius: 26,
     marginBottom: 26,
+    overflow: 'hidden',
+    backgroundColor: colors.cardBackground,
     elevation: 5,
-    shadowColor: colors.primary,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: isDarkMode ? 0.4 : 0.12,
     shadowRadius: 12,
   },
-  statusCardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 18,
-  },
-  statusCardLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '600',
-  },
-  statusCardTitle: {
-    fontSize: 24,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  statusCardIconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusBadgesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    gap: 5,
-  },
-  statusBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+  statusMapPreview: {
+    height: 200,
+    width: '100%',
   },
 
   sectionHeaderRow: {
@@ -412,8 +388,20 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  sosNavButtonTouchable: {
+  sosPulseWrapper: {
     marginTop: -48,
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sosPulseRing: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  sosNavButtonTouchable: {
     borderRadius: 40,
     elevation: 8,
     shadowColor: colors.primary,

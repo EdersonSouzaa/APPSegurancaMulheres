@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,8 +31,10 @@ import Constants from 'expo-constants';
 import { FakeCallModal } from '../components/FakeCallModal';
 import { ToastNotification } from '../components/ToastNotification';
 import { SuccessPopup } from '../components/SuccessPopup';
+import { LeafletMap } from '../components/LeafletMap';
 
 const TRUST_COLORS = ['#F5A623', '#7C4DFF', '#2196F3', '#4CAF50', '#FF7043'];
+const FORTALEZA_CENTER: [number, number] = [-3.766, -38.483];
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -59,6 +62,19 @@ const Home = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'danger' | 'info'>('success');
   const { coords } = useLocation();
+
+  // Pulsação sutil no botão SOS da barra de navegação
+  const sosPulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sosPulseAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(sosPulseAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sosPulseAnim]);
 
   // Edição/exclusão de ocorrências direto pelos cards da home
   const [editingOccurrence, setEditingOccurrence] = useState<any | null>(null);
@@ -279,8 +295,13 @@ const Home = () => {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerContent}>
-              <Text style={styles.headerGreeting}>{getGreeting()}</Text>
-              <Text style={styles.headerName}>{userName || 'Usuária'}</Text>
+              <Text style={styles.headerGreeting} numberOfLines={1}>
+                {getGreeting()} <Text style={styles.headerName}>{userName || 'Usuária'}</Text>
+              </Text>
+              <View style={styles.headerSubtitleRow}>
+                <Text style={styles.headerSubtitleText}>Você está segura aqui</Text>
+                <MaterialCommunityIcons name="heart" size={14} color={colors.primary} style={styles.headerSubtitleIcon} />
+              </View>
             </View>
 
             <View style={styles.headerActions}>
@@ -313,48 +334,31 @@ const Home = () => {
         </View>
 
         <View style={[styles.content, { paddingBottom: 100 + insets.bottom }]}>
-          {/* Card de status */}
-          <LinearGradient
-            colors={[colors.primary, '#C2185B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          {/* Card de status com preview do mapa em tempo real */}
+          <TouchableOpacity
             style={styles.statusCard}
+            activeOpacity={0.9}
+            onPress={() => {
+              if (locationEnabled) {
+                router.push('/mapa');
+              } else {
+                setLocationPopupVisible(true);
+              }
+            }}
           >
-            <View style={styles.statusCardTopRow}>
-              <View>
-                <Text style={styles.statusCardLabel}>Você está</Text>
-                <Text style={styles.statusCardTitle}>Protegida</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.statusCardIconButton}
-                activeOpacity={0.8}
-                onPress={() => {
-                  if (locationEnabled) {
-                    router.push('/mapa');
-                  } else {
-                    setLocationPopupVisible(true);
-                  }
-                }}
-              >
-                <MaterialCommunityIcons name="crosshairs-gps" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
+            <View style={styles.statusMapPreview}>
+              <LeafletMap
+                userCoords={coords}
+                riskZones={[]}
+                incidents={[]}
+                showIncidents={false}
+                interactive={false}
+                initialCenter={coords ? [coords.latitude, coords.longitude] : FORTALEZA_CENTER}
+                initialZoom={15}
+                isDarkMode={isDarkMode}
+              />
             </View>
-
-            <View style={styles.statusBadgesRow}>
-              <View style={styles.statusBadge}>
-                <MaterialCommunityIcons name="home-outline" size={14} color="#FFFFFF" />
-                <Text style={styles.statusBadgeText}>Zona segura</Text>
-              </View>
-              <View style={styles.statusBadge}>
-                <MaterialCommunityIcons name={locationEnabled ? 'eye-outline' : 'eye-off-outline'} size={14} color="#FFFFFF" />
-                <Text style={styles.statusBadgeText}>{locationEnabled ? 'Monitorando' : 'Não monitorado'}</Text>
-              </View>
-              <View style={styles.statusBadge}>
-                <MaterialCommunityIcons name="clock-outline" size={14} color="#FFFFFF" />
-                <Text style={styles.statusBadgeText}>24h</Text>
-              </View>
-            </View>
-          </LinearGradient>
+          </TouchableOpacity>
 
           {/* Ações rápidas */}
           <View style={styles.sectionHeaderRow}>
@@ -487,16 +491,29 @@ const Home = () => {
         <NavItem active icon={<MaterialIcons name="home" size={26} color={colors.primary} />} label="Início" styles={styles} />
         <NavItem icon={<MaterialCommunityIcons name="map-outline" size={26} color={colors.secondary} />} label="Mapa" onPress={() => router.push('/mapa')} styles={styles} />
         <View style={styles.sosNavItem}>
-          <TouchableOpacity style={styles.sosNavButtonTouchable} activeOpacity={0.85} onPress={() => router.push('/sos' as any)}>
-            <LinearGradient
-              colors={[colors.primary, '#C2185B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sosNavButton}
-            >
-              <Text style={styles.sosNavButtonText}>SOS</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={styles.sosPulseWrapper}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.sosPulseRing,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: sosPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+                  transform: [{ scale: sosPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.55] }) }],
+                },
+              ]}
+            />
+            <TouchableOpacity style={styles.sosNavButtonTouchable} activeOpacity={0.85} onPress={() => router.push('/sos' as any)}>
+              <LinearGradient
+                colors={[colors.primary, '#C2185B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sosNavButton}
+              >
+                <Text style={styles.sosNavButtonText}>SOS</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
         <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={26} color={colors.secondary} />} label="Contatos" onPress={() => router.push('/contatos')} styles={styles} />
         <NavItem icon={<MaterialCommunityIcons name="account-circle-outline" size={26} color={colors.secondary} />} label="Perfil" onPress={() => router.push('/perfil')} styles={styles} />

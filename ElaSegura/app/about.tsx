@@ -5,7 +5,9 @@ import {
   StyleSheet,
   StatusBar,
   ScrollView,
+  Image,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -13,10 +15,13 @@ import { useTheme } from '@/context/ThemeContext';
 import { Colors } from '@/constants/theme';
 import { BackHomeButton } from '@/components/BackHomeButton';
 
+const LOGO_IMAGE = require('../assets/images/logo.png');
+
 // Cores movidas para dentro do componente ou usando o tema central
 
 export default function About() {
   const { isDarkMode, theme } = useTheme();
+  const { width } = useWindowDimensions();
 
   // Cores dinâmicas para esta tela
   const colors = {
@@ -29,7 +34,8 @@ export default function About() {
     divider: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
   };
 
-  const styles = getStyles(colors);
+  const circleSize = Math.min(width * 0.45, 200);
+  const styles = getStyles(colors, circleSize);
 
   const FeatureRow = ({ icon, title, description }: { icon: any, title: string, description: string }) => (
     <View style={styles.featureItem}>
@@ -51,7 +57,7 @@ export default function About() {
 
       {/* Navbar fixa no topo */}
       <View style={styles.navbar}>
-        <BackHomeButton />
+        <BackHomeButton to="/perfil" />
         <Text style={styles.navbarTitle}>Sobre o App</Text>
         {/* View vazia apenas para centralizar o título perfeitamente */}
         <View style={{ width: 42 }} />
@@ -63,7 +69,7 @@ export default function About() {
       >
         <View style={styles.heroSection}>
           <View style={styles.iconCircleLarge}>
-            <MaterialCommunityIcons name="shield-sun-outline" size={60} color={colors.primary} />
+            <Image source={LOGO_IMAGE} style={styles.heroLogoImage} resizeMode="contain" />
           </View>
           <View style={styles.logoRow}>
             <Text style={styles.appNameText}>Ela</Text>
@@ -110,7 +116,7 @@ export default function About() {
   );
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
+const getStyles = (colors: any, circleSize: number) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
@@ -139,9 +145,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: 30,
   },
   iconCircleLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: circleSize,
+    height: circleSize,
+    borderRadius: circleSize / 2,
     backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
@@ -151,6 +157,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  heroLogoImage: {
+    width: circleSize * 0.7,
+    height: circleSize * 0.7,
   },
   logoRow: {
     flexDirection: 'row',

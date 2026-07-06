@@ -1,10 +1,9 @@
-import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Linking, Alert, ScrollView, Platform, Share, Image } from 'react-native';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StatusBar, Linking, Alert, ScrollView, Platform, Share, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { getStyles } from '../styles/sos.styles';
 import { useTheme } from '../context/ThemeContext';
@@ -12,12 +11,10 @@ import { Colors } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { EmergencyCallSheet } from '../components/EmergencyCallSheet';
-import { FakeCallModal } from '../components/FakeCallModal';
 import { CircularProgress } from '../components/CircularProgress';
 import { BackHomeButton } from '../components/BackHomeButton';
 
 const SEND_DURATION = 5; // segundos de animação de envio antes de entrar no estado ativo
-const HOLD_DURATION = 3000; // ms que o botão precisa ficar pressionado para disparar o SOS
 const CONTACT_COLORS = ['#F5A623', '#7C4DFF', '#2196F3', '#4CAF50'];
 
 const formatSeconds = (total: number) => {
@@ -41,28 +38,28 @@ const SOSScreen = () => {
   const [semContatos, setSemContatos] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
-  const [fakeCallVisible, setFakeCallVisible] = useState(false);
 
-  // Cabeçalho da tela de pedido de ajuda
-  const [userName, setUserName] = useState('');
-  const [profilePicture, setProfilePicture] = useState<string | null>(null);
-  const [alertsCount, setAlertsCount] = useState(0);
   const [addressText, setAddressText] = useState('Obtendo localização...');
-
-  // Segurar para ativar
-  const [holding, setHolding] = useState(false);
-  const [holdProgress, setHoldProgress] = useState(0);
 
   const cancelledRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Pulsação sutil no botão SOS principal
+  const sosPulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sosPulseAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(sosPulseAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sosPulseAnim]);
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
-      if (holdTimeoutRef.current) clearTimeout(holdTimeoutRef.current);
     };
   }, []);
 
@@ -71,31 +68,6 @@ const SOSScreen = () => {
       setPhase('active');
     }
   }, [phase, elapsedSeconds]);
-
-  const loadHeaderData = useCallback(async () => {
-    try {
-      const savedUser = await AsyncStorage.getItem('user');
-      if (savedUser) {
-        const user = JSON.parse(savedUser);
-        setUserName(user.name.split(' ')[0]);
-        setProfilePicture(user.profile_picture || null);
-      }
-
-      const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        const data = await api.get('/alertas', token);
-        setAlertsCount((data.alerts || []).length);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar cabeçalho do SOS:', error);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadHeaderData();
-    }, [loadHeaderData])
-  );
 
   useEffect(() => {
     (async () => {
@@ -239,39 +211,6 @@ const SOSScreen = () => {
     }
   };
 
-  const handleHoldPressIn = () => {
-    setHolding(true);
-    setHoldProgress(0);
-    const startedAt = Date.now();
-
-    holdIntervalRef.current = setInterval(() => {
-      setHoldProgress(Math.min(1, (Date.now() - startedAt) / HOLD_DURATION));
-    }, 50);
-
-    holdTimeoutRef.current = setTimeout(() => {
-      if (holdIntervalRef.current) {
-        clearInterval(holdIntervalRef.current);
-        holdIntervalRef.current = null;
-      }
-      setHolding(false);
-      setHoldProgress(0);
-      triggerSOSAlert();
-    }, HOLD_DURATION);
-  };
-
-  const handleHoldPressOut = () => {
-    if (holdTimeoutRef.current) {
-      clearTimeout(holdTimeoutRef.current);
-      holdTimeoutRef.current = null;
-    }
-    if (holdIntervalRef.current) {
-      clearInterval(holdIntervalRef.current);
-      holdIntervalRef.current = null;
-    }
-    setHolding(false);
-    setHoldProgress(0);
-  };
-
   // --- Estado "enviando ajuda" ---
   if (phase === 'sending') {
     return (
@@ -412,7 +351,7 @@ const SOSScreen = () => {
           </View>
 
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8 }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, paddingVertical: 6 }}
             activeOpacity={0.8}
             onPress={() => setEmergencyVisible(true)}
           >
@@ -427,8 +366,6 @@ const SOSScreen = () => {
   }
 
   // --- Estado inicial: pedido de ajuda ---
-  const userInitial = (userName || 'U').charAt(0).toUpperCase();
-
   return (
     <SafeAreaView style={styles.promptContainer} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={isDarkMode ? colors.background : '#FFECF4'} />
@@ -438,47 +375,30 @@ const SOSScreen = () => {
           <View style={styles.promptHeaderLeft}>
             <BackHomeButton />
           </View>
-
-          <View style={styles.promptHeaderActions}>
-            <TouchableOpacity style={styles.promptBellButton} onPress={() => router.push('/alertas' as any)} activeOpacity={0.8}>
-              <MaterialCommunityIcons name="bell-outline" size={20} color={colors.primary} />
-              {alertsCount > 0 && (
-                <View style={styles.promptBellBadge}>
-                  <Text style={styles.promptBellBadgeText}>{alertsCount > 9 ? '9+' : alertsCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.promptAvatar} onPress={() => router.push('/perfil')} activeOpacity={0.8}>
-              {profilePicture ? (
-                <Image source={{ uri: profilePicture }} style={{ width: 42, height: 42, borderRadius: 21 }} />
-              ) : (
-                <Text style={styles.promptAvatarText}>{userInitial}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
         </View>
 
         <View style={styles.promptTitleWrap}>
           <Text style={styles.promptTitle}>Precisa de ajuda agora?</Text>
           <Text style={styles.promptSubtitle}>
-            Segure o botão por 3 segundos para acionar o SOS. Seu círculo de confiança será avisado na hora.
+            Toque no botão para acionar o SOS. Seu círculo de confiança será avisado na hora.
           </Text>
         </View>
 
         <View style={styles.holdWrapper}>
           <View style={styles.sosGlowOuter} />
           <View style={styles.sosGlowInner} />
-          {holding && (
-            <View style={styles.holdRing}>
-              <CircularProgress size={172} strokeWidth={6} progress={holdProgress} color="#FFFFFF" trackColor="rgba(255,255,255,0.25)" />
-            </View>
-          )}
-          <TouchableOpacity
-            activeOpacity={1}
-            onPressIn={handleHoldPressIn}
-            onPressOut={handleHoldPressOut}
-          >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.sosPulseRing,
+              {
+                backgroundColor: colors.primary,
+                opacity: sosPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+                transform: [{ scale: sosPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+              },
+            ]}
+          />
+          <TouchableOpacity activeOpacity={0.85} onPress={triggerSOSAlert}>
             <LinearGradient
               colors={[colors.primary, '#C2185B']}
               start={{ x: 0, y: 0 }}
@@ -486,25 +406,26 @@ const SOSScreen = () => {
               style={styles.sosGradientButton}
             >
               <Text style={styles.holdButtonText}>SOS</Text>
-              <Text style={styles.holdButtonSubtext}>SEGURE 3S</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.promptQuickRow}>
-          <TouchableOpacity style={styles.promptQuickButton} activeOpacity={0.8} onPress={() => router.push('/mapa')}>
-            <MaterialCommunityIcons name="navigation-variant-outline" size={18} color={colors.primary} />
-            <Text style={styles.promptQuickButtonText}>Rota segura</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.promptQuickButton} activeOpacity={0.8} onPress={() => setFakeCallVisible(true)}>
-            <MaterialIcons name="call" size={18} color={colors.primary} />
-            <Text style={styles.promptQuickButtonText}>Chamada falsa</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.promptEmergencyLink} activeOpacity={0.8} onPress={() => setEmergencyVisible(true)}>
-          <MaterialCommunityIcons name="phone-alert" size={16} color={colors.primary} />
-          <Text style={styles.promptEmergencyLinkText}>Ligar para emergência</Text>
+        <TouchableOpacity style={styles.emergencyCallButtonWrapper} activeOpacity={0.85} onPress={() => setEmergencyVisible(true)}>
+          <LinearGradient
+            colors={['#E53935', '#B71C1C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.emergencyCallButton}
+          >
+            <View style={styles.emergencyCallIconBox}>
+              <MaterialCommunityIcons name="phone-alert" size={22} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.emergencyCallButtonText}>Ligar para emergência</Text>
+              <Text style={styles.emergencyCallButtonSubtext}>Polícia, SAMU e mais</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color="#FFFFFF" />
+          </LinearGradient>
         </TouchableOpacity>
 
         <View style={styles.promptLocationCard}>
@@ -518,30 +439,54 @@ const SOSScreen = () => {
         </View>
       </ScrollView>
 
-      <FakeCallModal visible={fakeCallVisible} onClose={() => setFakeCallVisible(false)} />
       <EmergencyCallSheet visible={emergencyVisible} onClose={() => setEmergencyVisible(false)} />
     </SafeAreaView>
   );
 };
 
-const SosGlowButton = ({ styles, colors, onPress, subtext }: any) => (
-  <View style={styles.sosGlowWrapper}>
-    <View style={styles.sosGlowOuter} />
-    <View style={styles.sosGlowInner} />
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress} disabled={!onPress}>
-      <LinearGradient
-        colors={[colors.primary, '#C2185B']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.sosGradientButton}
-      >
-        <MaterialCommunityIcons name="shield-alert" size={38} color="#FFFFFF" />
-        <Text style={styles.activeSosButtonText}>SOS</Text>
-        <Text style={styles.activeSosButtonSubtext}>{subtext}</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  </View>
-);
+const SosGlowButton = ({ styles, colors, onPress, subtext }: any) => {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View style={styles.sosGlowWrapper}>
+      <View style={styles.sosGlowOuter} />
+      <View style={styles.sosGlowInner} />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.sosPulseRing,
+          {
+            backgroundColor: colors.primary,
+            opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
+            transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.35] }) }],
+          },
+        ]}
+      />
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} disabled={!onPress}>
+        <LinearGradient
+          colors={[colors.primary, '#C2185B']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.sosGradientButton}
+        >
+          <MaterialCommunityIcons name="shield-alert" size={38} color="#FFFFFF" />
+          <Text style={styles.activeSosButtonText}>SOS</Text>
+          <Text style={styles.activeSosButtonSubtext}>{subtext}</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 const QuickActionButton = ({ icon, label, color, onPress, styles }: any) => (
   <TouchableOpacity style={styles.quickActionButton} activeOpacity={0.8} onPress={onPress}>

@@ -34,6 +34,35 @@ interface Contato {
 
 const CONTACT_COLORS = ['#F5A623', '#7C4DFF', '#2196F3', '#26A69A', '#EC407A', '#5C6BC0'];
 
+/** Formato de referência mostrado no campo vazio. */
+const TELEFONE_PLACEHOLDER = '(85) 99999-9999';
+
+/** Tamanho de '(XX) XXXXX-XXXX' — o teto de caracteres do campo. */
+const TELEFONE_MAX = TELEFONE_PLACEHOLDER.length;
+
+/**
+ * Aplica a máscara de telefone brasileiro: (XX) XXXXX-XXXX.
+ *
+ * Descarta tudo que não é dígito e para em 11 — DDD + celular com o nono
+ * dígito. Antes o campo aceitava caracteres sem limite nenhum.
+ *
+ * Números já salvos com mais de 11 dígitos (com +55 na frente, por exemplo)
+ * passam intactos: mascarar cortaria o começo e corromperia o contato ao
+ * abrir a edição.
+ */
+const formatarTelefone = (texto: string) => {
+  const digitos = texto.replace(/\D/g, '');
+
+  if (digitos.length > 11) return texto;
+  if (digitos.length === 0) return '';
+  if (digitos.length <= 2) return `(${digitos}`;
+  if (digitos.length <= 6) return `(${digitos.slice(0, 2)}) ${digitos.slice(2)}`;
+  if (digitos.length <= 10) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+};
+
 const DELEGACIA_CONTATO = {
   id: -1,
   name: 'Delegacia da Mulher',
@@ -146,7 +175,8 @@ export default function Contatos() {
   const openEditModal = (contato: Contato) => {
     setEditingContato(contato);
     setName(contato.name);
-    setPhone(contato.phone);
+    // Contatos salvos antes da máscara aparecem já formatados na edição.
+    setPhone(formatarTelefone(contato.phone));
     setEmergencial(contato.emergencial);
     setModalVisible(true);
   };
@@ -275,11 +305,12 @@ export default function Contatos() {
               <MaterialCommunityIcons name="phone-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
               <TextInput
                 style={styles.inputFieldText}
-                placeholder="Telefone"
+                placeholder={TELEFONE_PLACEHOLDER}
                 placeholderTextColor={colors.secondary}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(texto) => setPhone(formatarTelefone(texto))}
                 keyboardType="phone-pad"
+                maxLength={TELEFONE_MAX}
               />
             </View>
 

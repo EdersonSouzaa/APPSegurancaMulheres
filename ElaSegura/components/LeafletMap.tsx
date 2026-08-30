@@ -51,6 +51,12 @@ type Props = {
   interactive?: boolean;
 };
 
+/**
+ * react-native-webview não existe na web — lá o mapa roda dentro de um iframe.
+ * Fora do componente porque Platform.OS é fixo durante toda a execução.
+ */
+const NA_WEB = Platform.OS === 'web';
+
 const ZONE_COLORS: Record<ZoneLevel, string> = {
   safe: '#34C759',
   alert: '#FFCC00',
@@ -329,12 +335,9 @@ export const LeafletMap = React.forwardRef<{ recenter: () => void }, Props>(func
   const readyRef = useRef(false);
   const html = useMemo(() => buildHtml(isDarkMode, interactive), [isDarkMode, interactive]);
 
-  /** react-native-webview não existe na web — lá o mapa roda dentro de um iframe. */
-  const naWeb = Platform.OS === 'web';
-
   const inject = (code: string) => {
     if (!readyRef.current) return;
-    if (naWeb) {
+    if (NA_WEB) {
       // O iframe usa srcDoc, então herda a origem da página e o
       // contentWindow é acessível diretamente.
       try {
@@ -448,7 +451,7 @@ export const LeafletMap = React.forwardRef<{ recenter: () => void }, Props>(func
 
   return (
     <View style={styles.container} pointerEvents={interactive ? 'auto' : 'none'}>
-      {naWeb ? (
+      {NA_WEB ? (
         <iframe
           ref={iframeRef}
           srcDoc={html}

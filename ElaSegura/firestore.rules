@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logada() { return request.auth != null; }
+    function dona(uid) { return request.auth != null && request.auth.uid == uid; }
+
+    match /usuarios/{uid} {
+      allow read: if logada();
+      allow create, update: if dona(uid);
+      allow delete: if false;
+
+      // Contatos de emergencia sao 100% privados da usuaria.
+      match /contatos/{contatoId} {
+        allow read, write: if dona(uid);
+      }
+    }
+
+    match /ocorrencias/{id} {
+      allow read: if logada();
+      allow create: if logada()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.type in ['error', 'warning']
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0;
+      allow update, delete: if logada()
+                    && resource.data.userId == request.auth.uid;
+    }
+
+    match /sos/{id} {
+      allow read: if logada() && resource.data.userId == request.auth.uid;
+      allow create: if logada() && request.resource.data.userId == request.auth.uid;
+      // SOS e registro historico: nao se edita nem se apaga.
+      allow update, delete: if false;
+    }
+  }
+}

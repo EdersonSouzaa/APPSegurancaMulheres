@@ -1,0 +1,13 @@
+{
+  "name": "elasegura-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App Expo do ElaSegura. O backend agora e o Firebase (Auth + Firestore); a pasta ./server e legado da API Express.",
+  "scripts": {
+    "front": "npm --prefix ./ElaSegura run start",
+    "android": "npm --prefix ./ElaSegura run android",
+    "ios": "npm --prefix ./ElaSegura run ios",
+    "web": "npm --prefix ./ElaSegura run web",
+    "install:all": "npm --prefix ./ElaSegura install"
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,6 +27,8 @@ import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import { sair } from '../services/auth';
+import { limparSessao } from '../services/session';
 
 const formatMemberSince = (createdAt: string) => {
   const date = new Date(createdAt);
@@ -54,6 +58,25 @@ export default function Perfil() {
   const [editEmail, setEditEmail] = useState('');
   const [contatosCount, setContatosCount] = useState(0);
   const [alertasCount, setAlertasCount] = useState(0);
+  const [logoutWidth, setLogoutWidth] = useState(0);
+  const logoutShift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!logoutWidth) return;
+    logoutShift.setValue(0);
+    const animation = Animated.loop(
+      Animated.timing(logoutShift, {
+        toValue: 1,
+        duration: 5000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+      { iterations: -1, resetBeforeIteration: true }
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [logoutWidth, logoutShift]);
+
 
   const loadUserData = useCallback(async () => {
     try {
@@ -149,6 +172,15 @@ export default function Perfil() {
       }
       setUserData((prev) => ({ ...prev, name: updated.name, email: updated.email }));
       setEditModalVisible(false);
+
+      // O Firebase não troca o e-mail de login sem confirmação: ele envia um
+      // link para o novo endereço e só efetiva depois do clique.
+      if (updated.emailPendenteConfirmacao) {
+        Alert.alert(
+          'Confirme o novo e-mail',
+          `Enviamos um link de confirmação para ${editEmail.trim()}. Seu e-mail de login só muda depois que você clicar nele.`
+        );
+      }
     } catch (error: any) {
       Alert.alert('Erro', error.message || 'Não foi possível salvar as alterações.');
     } finally {
@@ -265,19 +297,48 @@ export default function Perfil() {
           style={styles.logoutButtonWrapper}
           activeOpacity={0.85}
           onPress={async () => {
-            await AsyncStorage.multiRemove(['userToken', 'user']);
+            // signOut encerra a sessão no Firebase; limpar só o AsyncStorage
+            // deixaria a usuária autenticada por baixo dos panos.
+            try {
+              await sair();
+            } catch (e) {
+              console.error('Erro ao sair:', e);
+            }
+            await limparSessao();
             router.replace('/login');
           }}
         >
-          <LinearGradient
-            colors={[colors.primary, '#C2185B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+          <View
             style={styles.logoutButton}
+            onLayout={(e) => setLogoutWidth(e.nativeEvent.layout.width)}
           >
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.logoutGradientLayer,
+                {
+                  width: logoutWidth * 2,
+                  transform: [
+                    {
+                      translateX: logoutShift.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -logoutWidth],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={[colors.primary, '#C2185B', colors.primary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.logoutGradientFill}
+              />
+            </Animated.View>
             <MaterialCommunityIcons name="logout" size={20} color="#FFFFFF" />
             <Text style={styles.logoutText}>Sair da conta</Text>
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />

@@ -139,9 +139,17 @@ const Home = () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (token) {
-        const data = await api.get('/contatos', token);
-        const emergenciais = (data || []).filter((c: any) => c.emergencial);
-        setTrustedContacts(emergenciais);
+        const data: any[] = (await api.get('/contatos', token)) || [];
+
+        // Mostra todos os contatos cadastrados, com os emergenciais na frente.
+        // Antes o filtro deixava só os emergenciais, então quem cadastrava um
+        // contato sem marcar o switch via o círculo vazio e achava que o
+        // cadastro tinha falhado.
+        const ordenados = [
+          ...data.filter((c) => c.emergencial),
+          ...data.filter((c) => !c.emergencial),
+        ];
+        setTrustedContacts(ordenados);
       }
     } catch (error) {
       console.error('Erro ao carregar círculo de confiança:', error);
@@ -417,6 +425,13 @@ const Home = () => {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trustCircleRow}>
+            <TouchableOpacity style={styles.trustCircleItem} activeOpacity={0.8} onPress={() => router.push('/contatos')}>
+              <View style={styles.trustCircleAddButton}>
+                <MaterialCommunityIcons name="plus" size={24} color={colors.primary} />
+              </View>
+              <Text style={styles.trustCircleName}>Adicionar</Text>
+            </TouchableOpacity>
+
             {trustedContacts.map((contact, index) => (
               <TouchableOpacity
                 key={contact.id}
@@ -430,13 +445,6 @@ const Home = () => {
                 <Text style={styles.trustCircleName} numberOfLines={1}>{contact.name.split(' ')[0]}</Text>
               </TouchableOpacity>
             ))}
-
-            <TouchableOpacity style={styles.trustCircleItem} activeOpacity={0.8} onPress={() => router.push('/contatos')}>
-              <View style={styles.trustCircleAddButton}>
-                <MaterialCommunityIcons name="plus" size={24} color={colors.primary} />
-              </View>
-              <Text style={styles.trustCircleName}>Adicionar</Text>
-            </TouchableOpacity>
           </ScrollView>
 
           {/* Ocorrências Recentes */}

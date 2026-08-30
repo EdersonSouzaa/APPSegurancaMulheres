@@ -18,8 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { api } from '../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { entrar, registrar, recuperarSenha, mensagemErroAuth } from '../services/auth';
+import { sincronizarSessao } from '../services/session';
 import { SuccessPopup } from '../components/SuccessPopup';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
@@ -52,9 +52,8 @@ export default function Login() {
 
   // Recuperar senha
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
 
   const colors = Colors[theme];
@@ -83,15 +82,15 @@ export default function Login() {
     }
 
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const { user } = await entrar(email, password);
 
-      await AsyncStorage.setItem('user', JSON.stringify(response.user));
-      await AsyncStorage.setItem('userToken', response.token);
-      await AsyncStorage.setItem('userPassword', password);
+      // Aguarda o espelho no AsyncStorage antes de navegar: a home lê 'user'
+      // e 'userToken' já no primeiro render.
+      await sincronizarSessao(user);
 
       router.replace('/home');
     } catch (error: any) {
-      setLoginError('E-mail ou senha incorretos');
+      setLoginError(mensagemErroAuth(error));
     }
   };
 
@@ -120,43 +119,34 @@ export default function Login() {
     }
 
     try {
-      await api.post('/auth/register', { name, email: registerEmail, password: registerPassword });
+      await registrar(name, registerEmail, registerPassword);
       setIsPopupVisible(true);
     } catch (error: any) {
-      Alert.alert('Erro no Cadastro', error.message);
+      Alert.alert('Erro no Cadastro', mensagemErroAuth(error));
     }
   };
 
   const handleRecoverPassword = async () => {
-    if (!email) {
-      Alert.alert('Erro', 'Por favor, digite seu e-mail no formulário de login primeiro.');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!resetEmail) {
+      Alert.alert('Erro', 'Digite o e-mail da sua conta.');
       return;
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(resetEmail)) {
       Alert.alert('Erro', 'Formato de e-mail inválido.');
       return;
     }
 
-    if (newPassword !== confirmNewPassword || newPassword === '') {
-      Alert.alert('Erro', 'As senhas não coincidem ou estão vazias.');
-      return;
-    }
-
-    if (newPassword.length < 6 || newPassword.length > 20) {
-      Alert.alert('Erro', 'A nova senha precisa ter entre 6 e 20 caracteres.');
-      return;
-    }
-
+    setIsSendingReset(true);
     try {
-      await api.post('/auth/reset-password', { email, newPassword });
-      setIsSuccessVisible(true);
+      await recuperarSenha(resetEmail);
       setIsModalVisible(false);
-      setNewPassword('');
-      setConfirmNewPassword('');
+      setIsSuccessVisible(true);
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      Alert.alert('Erro', mensagemErroAuth(error));
+    } finally {
+      setIsSendingReset(false);
     }
   };
 
@@ -168,8 +158,8 @@ export default function Login() {
 
       <SuccessPopup
         visible={isSuccessVisible}
-        title="Senha Alterada!"
-        message="Sua nova senha já está valendo. Agora é só entrar!"
+        title="E-mail enviado!"
+        message="Se existir uma conta com esse e-mail, você receberá um link para criar uma nova senha. Confira também o spam."
         onContinue={() => setIsSuccessVisible(false)}
       />
 
@@ -252,7 +242,13 @@ export default function Login() {
 
               {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
 
-              <TouchableOpacity style={styles.forgotPassword} onPress={() => setIsModalVisible(true)}>
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => {
+                  setResetEmail(email);
+                  setIsModalVisible(true);
+                }}
+              >
                 <Text style={styles.forgotPasswordText}>Esqueci minha senha</Text>
               </TouchableOpacity>
 
@@ -370,42 +366,31 @@ export default function Login() {
             </View>
 
             <Text style={styles.modalDescription}>
-              Digite sua nova senha abaixo para atualizar seu acesso.
+              Enviaremos um link seguro para o seu e-mail. É por ele que você cria uma nova senha.
             </Text>
 
             <View style={styles.modalInputContainer}>
-              <MaterialCommunityIcons name="lock-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
+              <MaterialCommunityIcons name="email-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.modalInput}
-                placeholder="Nova Senha"
+                placeholder="seuemail@email.com"
                 placeholderTextColor={colors.secondary}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry={!showNewPassword}
-              />
-              <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
-                <MaterialCommunityIcons
-                  name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={24}
-                  color={colors.secondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalInputContainer}>
-              <MaterialCommunityIcons name="lock-check-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Confirmar Nova Senha"
-                placeholderTextColor={colors.secondary}
-                value={confirmNewPassword}
-                onChangeText={setConfirmNewPassword}
-                secureTextEntry={!showNewPassword}
+                value={resetEmail}
+                onChangeText={setResetEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
             </View>
 
-            <TouchableOpacity style={styles.modalButton} onPress={handleRecoverPassword} activeOpacity={0.8}>
-              <Text style={styles.modalButtonText}>Redefinir Senha</Text>
+            <TouchableOpacity
+              style={[styles.modalButton, isSendingReset && { opacity: 0.6 }]}
+              onPress={handleRecoverPassword}
+              activeOpacity={0.8}
+              disabled={isSendingReset}
+            >
+              <Text style={styles.modalButtonText}>
+                {isSendingReset ? 'Enviando...' : 'Enviar link de redefinição'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

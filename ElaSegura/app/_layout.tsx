@@ -12,6 +12,8 @@ import {
   Poppins_700Bold,
 } from '@expo-google-fonts/poppins';
 import { applyGlobalFont } from '@/constants/globalFont';
+import { observarAuth } from '@/services/auth';
+import { sincronizarSessao, limparSessao } from '@/services/session';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -51,6 +53,24 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded]);
+
+  // O Firebase restaura a sessão sozinho ao abrir o app, mas as telas leem
+  // nome/foto e o gate de login do AsyncStorage. Este listener mantém as duas
+  // fontes em sincronia — inclusive depois de fechar e reabrir o app.
+  useEffect(() => {
+    const cancelar = observarAuth((user) => {
+      if (user) {
+        sincronizarSessao(user).catch((e) =>
+          console.error('[auth] falha ao sincronizar a sessão:', e)
+        );
+      } else {
+        limparSessao().catch((e) =>
+          console.error('[auth] falha ao limpar a sessão:', e)
+        );
+      }
+    });
+    return cancelar;
+  }, []);
 
   if (!fontsLoaded) {
     return null;

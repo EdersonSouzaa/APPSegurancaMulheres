@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { getStyles } from '../styles/contatos.styles';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 import { api } from '../services/api';
@@ -24,7 +25,8 @@ import { ToastNotification } from '../components/ToastNotification';
 import { BackHomeButton } from '../components/BackHomeButton';
 
 interface Contato {
-  id: number;
+  /** Id do documento no Firestore — string, não número. */
+  id: string;
   name: string;
   phone: string;
   emergencial: boolean;
@@ -44,10 +46,8 @@ export default function Contatos() {
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
-  const [contatos, setContatos] = useState<Contato[]>([
-    { id: 1, name: 'Mãe', phone: '+55 11 98888-1020', emergencial: true },
-  ]);
-  const [loading, setLoading] = useState(false as any);
+  const [contatos, setContatos] = useState<Contato[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingContato, setEditingContato] = useState<Contato | null>(null);
   const [name, setName] = useState('');
@@ -72,11 +72,7 @@ export default function Contatos() {
     }
   };
 
-  useEffect(() => {
-    // fetchContatos();
-  }, []);
-
-  const fetchContatos = async () => {
+  const fetchContatos = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
@@ -84,14 +80,22 @@ export default function Contatos() {
         return;
       }
       const data = await api.get('/contatos', token);
-      setContatos(data);
+      setContatos(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error('Error fetching contatos:', error);
       Alert.alert('Erro', 'Não foi possível carregar os contatos.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Recarrega toda vez que a tela ganha foco, não só na montagem: ao voltar
+  // da home o usuário precisa ver o que foi alterado em outro lugar.
+  useFocusEffect(
+    useCallback(() => {
+      fetchContatos();
+    }, [fetchContatos])
+  );
 
   const handleSave = async () => {
     if (!name || !phone) {
@@ -114,7 +118,7 @@ export default function Contatos() {
     }
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     Alert.alert(
       'Confirmar',
       'Deseja realmente excluir este contato?',
@@ -168,7 +172,7 @@ export default function Contatos() {
 
       {/* Cabeçalho */}
       <View style={styles.header}>
-        <BackHomeButton to="/perfil" />
+        <BackHomeButton />
         <Text style={styles.headerTitle}>Contatos</Text>
         <TouchableOpacity
           style={styles.addButton}

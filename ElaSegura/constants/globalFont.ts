@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextInput } from 'react-native';
+import { StyleSheet, Text, TextInput } from 'react-native';
 
 const FONT_MAP = {
   regular: 'Poppins_400Regular',
@@ -31,6 +31,29 @@ const resolveFontFamily = (style: any) => {
 
 let applied = false;
 
+/**
+ * Injeta a fonte padrão no elemento já renderizado por Text/TextInput.
+ *
+ * O style precisa sair daqui como um OBJETO, não como array.
+ *
+ * No React Native um array de styles é normal. No react-native-web, porém,
+ * `render` já devolveu o elemento do DOM (<span> / <input>) — e o React
+ * atribui `style` direto ao CSSStyleDeclaration. Um array vira `node.style[0]`
+ * e o navegador lança:
+ *
+ *   TypeError: Failed to set an indexed property [0] on 'CSSStyleDeclaration'
+ *
+ * StyleSheet.flatten resolve o array antes disso, mantendo a mesma precedência
+ * (o style de quem chama sobrescreve a fontFamily padrão) nas duas plataformas.
+ */
+const comFontePadrao = (origin: any) =>
+  React.cloneElement(origin, {
+    style: StyleSheet.flatten([
+      { fontFamily: resolveFontFamily(origin.props.style) },
+      origin.props.style,
+    ]),
+  });
+
 export const applyGlobalFont = () => {
   if (applied) return;
   applied = true;
@@ -38,18 +61,12 @@ export const applyGlobalFont = () => {
   const TextAny = Text as any;
   const originalTextRender = TextAny.render;
   TextAny.render = function (...args: any[]) {
-    const origin = originalTextRender.apply(this, args);
-    return React.cloneElement(origin, {
-      style: [{ fontFamily: resolveFontFamily(origin.props.style) }, origin.props.style],
-    });
+    return comFontePadrao(originalTextRender.apply(this, args));
   };
 
   const InputAny = TextInput as any;
   const originalInputRender = InputAny.render;
   InputAny.render = function (...args: any[]) {
-    const origin = originalInputRender.apply(this, args);
-    return React.cloneElement(origin, {
-      style: [{ fontFamily: resolveFontFamily(origin.props.style) }, origin.props.style],
-    });
+    return comFontePadrao(originalInputRender.apply(this, args));
   };
 };

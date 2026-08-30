@@ -187,6 +187,17 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     borderRadius: 18,
     paddingVertical: 16,
     gap: 10,
+    overflow: 'hidden',
+    backgroundColor: colors.primary,
+  },
+  logoutGradientLayer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+  },
+  logoutGradientFill: {
+    flex: 1,
   },
   logoutText: {
     color: '#FFFFFF',

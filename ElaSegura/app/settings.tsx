@@ -207,8 +207,6 @@ export default function Settings() {
         newPassword
       }, token);
 
-      await AsyncStorage.setItem('userPassword', newPassword);
-
       Alert.alert('Sucesso', 'Senha atualizada com sucesso!');
       setCurrentPassword('');
       setNewPassword('');

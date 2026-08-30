@@ -28,7 +28,11 @@ type OccurrenceType = 'error' | 'warning';
 type TabType = 'gerais' | 'proximas';
 
 type Occurrence = {
-  id: number;
+  /**
+   * String quando o registro veio do Firestore (id do documento) e número
+   * negativo quando é só local, ainda não sincronizado.
+   */
+  id: string | number;
   title: string;
   desc: string;
   time: string;
@@ -51,7 +55,7 @@ export default function Ocorrencias() {
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   const [occurrences, setOccurrences] = useState(initialOccurrences);
-  const userIdRef = useRef<number | null>(null);
+  const userIdRef = useRef<string | number | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('proximas');
   const [radiusFilter, setRadiusFilter] = useState(1000);
   const [modalVisible, setModalVisible] = useState(false);
@@ -61,7 +65,7 @@ export default function Ocorrencias() {
   const [distance, setDistance] = useState<number>(500);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todos');
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [toastVisible, setToastVisible] = useState(false);
@@ -88,7 +92,7 @@ export default function Ocorrencias() {
     const loadData = async () => {
       try {
         const savedUser = await AsyncStorage.getItem('user');
-        let activeUserId: number | null = null;
+        let activeUserId: string | number | null = null;
         if (savedUser) {
           const user = JSON.parse(savedUser);
           activeUserId = user.id;
@@ -109,7 +113,7 @@ export default function Ocorrencias() {
     loadData();
   }, []);
 
-  const saveOccurrences = async (newOccurrences: Occurrence[], activeUserId?: number | null) => {
+  const saveOccurrences = async (newOccurrences: Occurrence[], activeUserId?: string | number | null) => {
     try {
       const idToUse = activeUserId !== undefined ? activeUserId : userIdRef.current;
       const key = idToUse ? `@occurrences_data_${idToUse}` : '@occurrences_data';
@@ -227,7 +231,7 @@ const filteredOccurrences = useMemo(() => {
           }
         } catch {}
 
-        let serverId: number | null = null;
+        let serverId: string | null = null;
         if (token) {
           try {
             const created = await api.post(

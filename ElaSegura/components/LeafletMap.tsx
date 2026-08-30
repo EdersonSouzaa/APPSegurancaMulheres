@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { Coords } from '../hooks/use-location';
 
@@ -182,8 +182,12 @@ const buildHtml = (isDarkMode: boolean, interactive: boolean) => `<!DOCTYPE html
   const pulseIcon = L.divIcon({ className: '', html: '<div class="user-pulse"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
   const dotIcon = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [14, 14], iconAnchor: [7, 7] });
 
+  // Duas pontes: no celular o host e o WebView; na web e o iframe falando
+  // com a pagina que o contem.
   function send(msg) {
-    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+    var data = JSON.stringify(msg);
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(data);
+    else if (window.parent && window.parent !== window) window.parent.postMessage(data, '*');
   }
 
   function setBounds(b) {
@@ -321,11 +325,25 @@ export const LeafletMap = React.forwardRef<{ recenter: () => void }, Props>(func
   ref
 ) {
   const webRef = useRef<WebView>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const html = useMemo(() => buildHtml(isDarkMode, interactive), [isDarkMode, interactive]);
 
+  /** react-native-webview não existe na web — lá o mapa roda dentro de um iframe. */
+  const naWeb = Platform.OS === 'web';
+
   const inject = (code: string) => {
     if (!readyRef.current) return;
+    if (naWeb) {
+      // O iframe usa srcDoc, então herda a origem da página e o
+      // contentWindow é acessível diretamente.
+      try {
+        (iframeRef.current?.contentWindow as any)?.eval(code);
+      } catch (e) {
+        console.warn('[LeafletMap] não foi possível injetar no iframe:', e);
+      }
+      return;
+    }
     webRef.current?.injectJavaScript(code + '; true;');
   };
 
@@ -378,43 +396,83 @@ export const LeafletMap = React.forwardRef<{ recenter: () => void }, Props>(func
     recenter: () => inject('window.__map.recenter()'),
   }));
 
+  // Guardado em ref para o listener da web sempre enxergar os props atuais
+  // sem precisar reassinar o evento a cada render.
+  const handleMessageRef = useRef<(raw: string) => void>(() => {});
+  handleMessageRef.current = (raw: string) => {
+    try {
+      const msg = JSON.parse(raw);
+      if (msg.type === 'ready') {
+        readyRef.current = true;
+        if (maxBounds) {
+          inject(`window.__map.setBounds(${JSON.stringify(maxBounds)})`);
+        }
+        if (initialCenter) {
+          inject(`window.__map.setView(${initialCenter[0]}, ${initialCenter[1]}, ${initialZoom ?? 14})`);
+        }
+        if (userCoords) {
+          inject(`window.__map.setUser(${userCoords.latitude}, ${userCoords.longitude}, 0)`);
+        }
+        inject(`window.__map.setRiskZones(${JSON.stringify(zonesPayload)}, ${JSON.stringify(activeZoneFilter)})`);
+        const incPayload = incidents.map((i) => ({ lat: i.lat, lng: i.lng, type: i.type, title: i.title ?? null }));
+        inject(`window.__map.setIncidents(${JSON.stringify(incPayload)}, ${showIncidents})`);
+        inject(`window.__map.setMarkedZones(${JSON.stringify(markedPayload)})`);
+        inject(`window.__map.setDrawMode(${drawColor != null})`);
+      } else if (msg.type === 'mapClick') {
+        onMapPress?.(msg.lat, msg.lng);
+      } else if (msg.type === 'markClick') {
+        onMarkPress?.(msg.id);
+      }
+    } catch {}
+  };
+
+  // Na web o mapa fala com a página por postMessage, não pelo onMessage do WebView.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const aoReceber = (evento: MessageEvent) => {
+      if (iframeRef.current && evento.source !== iframeRef.current.contentWindow) return;
+      if (typeof evento.data !== 'string') return;
+      handleMessageRef.current(evento.data);
+    };
+
+    window.addEventListener('message', aoReceber);
+    return () => window.removeEventListener('message', aoReceber);
+  }, []);
+
+  // Um iframe recriado perde o estado do Leaflet: readyRef precisa voltar a
+  // false para o 'ready' seguinte reenviar zonas, incidentes e posição.
+  useEffect(() => {
+    readyRef.current = false;
+  }, [html]);
+
   return (
     <View style={styles.container} pointerEvents={interactive ? 'auto' : 'none'}>
-      <WebView
-        ref={webRef}
-        originWhitelist={['*']}
-        source={{ html }}
-        style={styles.web}
-        scrollEnabled={interactive}
-        javaScriptEnabled
-        domStorageEnabled
-        onMessage={(event) => {
-          try {
-            const msg = JSON.parse(event.nativeEvent.data);
-            if (msg.type === 'ready') {
-              readyRef.current = true;
-              if (maxBounds) {
-                inject(`window.__map.setBounds(${JSON.stringify(maxBounds)})`);
-              }
-              if (initialCenter) {
-                inject(`window.__map.setView(${initialCenter[0]}, ${initialCenter[1]}, ${initialZoom ?? 14})`);
-              }
-              if (userCoords) {
-                inject(`window.__map.setUser(${userCoords.latitude}, ${userCoords.longitude}, 0)`);
-              }
-              inject(`window.__map.setRiskZones(${JSON.stringify(zonesPayload)}, ${JSON.stringify(activeZoneFilter)})`);
-              const incPayload = incidents.map((i) => ({ lat: i.lat, lng: i.lng, type: i.type, title: i.title ?? null }));
-              inject(`window.__map.setIncidents(${JSON.stringify(incPayload)}, ${showIncidents})`);
-              inject(`window.__map.setMarkedZones(${JSON.stringify(markedPayload)})`);
-              inject(`window.__map.setDrawMode(${drawColor != null})`);
-            } else if (msg.type === 'mapClick') {
-              onMapPress?.(msg.lat, msg.lng);
-            } else if (msg.type === 'markClick') {
-              onMarkPress?.(msg.id);
-            }
-          } catch {}
-        }}
-      />
+      {naWeb ? (
+        <iframe
+          ref={iframeRef}
+          srcDoc={html}
+          title="Mapa"
+          style={{
+            border: 'none',
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            backgroundColor: 'transparent',
+          }}
+        />
+      ) : (
+        <WebView
+          ref={webRef}
+          originWhitelist={['*']}
+          source={{ html }}
+          style={styles.web}
+          scrollEnabled={interactive}
+          javaScriptEnabled
+          domStorageEnabled
+          onMessage={(event) => handleMessageRef.current(event.nativeEvent.data)}
+        />
+      )}
     </View>
   );
 });

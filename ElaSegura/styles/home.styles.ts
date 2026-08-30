@@ -78,13 +78,13 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     fontWeight: 'bold',
   },
   headerGreeting: {
-    fontSize: 19,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.secondary,
     letterSpacing: 0.2,
   },
   headerName: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '800',
     color: colors.text,
   },

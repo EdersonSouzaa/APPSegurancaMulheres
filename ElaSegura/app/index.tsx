@@ -14,10 +14,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../context/ThemeContext';
 import { Colors, ThemeColors } from '../constants/theme';
 
 const MULHER_IMAGE = require('../assets/images/logo.png');
+
+// Esta é a tela de abertura do app: ela fica SEMPRE no tema claro, mesmo que a
+// pessoa já tenha escolhido o tema escuro nas configurações. Por isso aqui não
+// usamos o useTheme() — as cores vêm fixas de Colors.light.
+const LIGHT_COLORS = Colors.light;
+const LIGHT_GRADIENT = ['#FFFFFF', '#FFECF4'] as const;
 
 const SLIDES = [
   {
@@ -43,14 +48,34 @@ const SLIDES = [
   },
 ];
 
+type Metrics = ReturnType<typeof getMetrics>;
+
+// A ilustração é limitada pela menor dimensão E pela altura da tela, para não
+// ficar gigante em celular/tablet nem estourar em telas baixas ou em paisagem.
+const getMetrics = (width: number, height: number) => {
+  const shortestSide = Math.min(width, height);
+  const illustrationSize = Math.round(
+    Math.max(132, Math.min(shortestSide * 0.55, height * 0.28, 240))
+  );
+
+  return {
+    illustrationSize,
+    horizontalPadding: Math.round(Math.max(20, Math.min(width * 0.07, 32))),
+    illustrationSpacing: Math.round(Math.max(12, illustrationSize * 0.09)),
+    titleSize: Math.round(Math.max(24, Math.min(shortestSide * 0.082, 32))),
+    descriptionSize: Math.round(Math.max(13, Math.min(shortestSide * 0.039, 15))),
+    buttonHeight: Math.round(Math.max(50, Math.min(height * 0.07, 58))),
+    dotsSpacing: Math.round(Math.max(14, Math.min(height * 0.03, 24))),
+  };
+};
+
 export default function Welcome() {
   const router = useRouter();
-  const { theme, isDarkMode } = useTheme();
-  const colors = Colors[theme];
-  const { width } = useWindowDimensions();
+  const colors = LIGHT_COLORS;
+  const { width, height } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
-  const illustrationSize = Math.min(width * 0.85, 420);
-  const styles = useMemo(() => getStyles(illustrationSize, colors), [illustrationSize, colors]);
+  const metrics = useMemo(() => getMetrics(width, height), [width, height]);
+  const styles = useMemo(() => getStyles(metrics, colors), [metrics, colors]);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const activeIndexRef = useRef(activeIndex);
@@ -78,16 +103,12 @@ export default function Welcome() {
     })
   ).current;
 
-  const gradientColors = isDarkMode
-    ? (['#121212', '#1E1E1E'] as const)
-    : (['#FFFFFF', '#FFECF4'] as const);
-
   const slide = SLIDES[activeIndex];
 
   return (
-    <LinearGradient colors={gradientColors} style={styles.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+    <LinearGradient colors={LIGHT_GRADIENT} style={styles.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
         <View style={styles.content}>
           <Animated.View style={[styles.slide, { opacity: fadeAnim }]} {...panResponder.panHandlers}>
@@ -144,7 +165,7 @@ export default function Welcome() {
   );
 }
 
-const getStyles = (illustrationSize: number, colors: ThemeColors) => StyleSheet.create({
+const getStyles = (metrics: Metrics, colors: ThemeColors) => StyleSheet.create({
   gradient: {
     flex: 1,
   },
@@ -157,20 +178,21 @@ const getStyles = (illustrationSize: number, colors: ThemeColors) => StyleSheet.
     justifyContent: 'center',
   },
   slide: {
-    paddingHorizontal: 28,
+    paddingHorizontal: metrics.horizontalPadding,
     alignItems: 'flex-start',
   },
   illustrationBox: {
     alignSelf: 'center',
-    width: illustrationSize,
-    height: illustrationSize,
+    width: metrics.illustrationSize,
+    height: metrics.illustrationSize,
+    maxWidth: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: metrics.illustrationSpacing,
   },
   illustrationImage: {
-    width: illustrationSize,
-    height: illustrationSize,
+    width: '100%',
+    height: '100%',
   },
   kickerPill: {
     flexDirection: 'row',
@@ -192,8 +214,8 @@ const getStyles = (illustrationSize: number, colors: ThemeColors) => StyleSheet.
   dots: {
     flexDirection: 'row',
     alignSelf: 'center',
-    marginTop: 24,
-    marginBottom: 32,
+    marginTop: metrics.dotsSpacing,
+    marginBottom: Math.round(metrics.dotsSpacing * 1.3),
   },
   dot: {
     width: 8,
@@ -207,20 +229,20 @@ const getStyles = (illustrationSize: number, colors: ThemeColors) => StyleSheet.
     backgroundColor: colors.primary,
   },
   title: {
-    fontSize: 32,
+    fontSize: metrics.titleSize,
     fontWeight: 'bold',
     color: colors.text,
-    lineHeight: 40,
+    lineHeight: Math.round(metrics.titleSize * 1.25),
     marginBottom: 16,
     letterSpacing: 0.2,
   },
   description: {
-    fontSize: 15,
+    fontSize: metrics.descriptionSize,
     color: colors.secondary,
-    lineHeight: 22,
+    lineHeight: Math.round(metrics.descriptionSize * 1.47),
   },
   primaryButtonWrapper: {
-    marginHorizontal: 28,
+    marginHorizontal: metrics.horizontalPadding,
     borderRadius: 18,
     marginTop: 20,
     marginBottom: 18,
@@ -231,7 +253,7 @@ const getStyles = (illustrationSize: number, colors: ThemeColors) => StyleSheet.
     shadowRadius: 8,
   },
   primaryButton: {
-    height: 58,
+    height: metrics.buttonHeight,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',

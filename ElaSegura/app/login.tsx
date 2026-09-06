@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Fonts } from '../constants/globalFont';
 import {
   View,
   Text,
@@ -432,6 +433,7 @@ const getStyles = (colors: any, logoSize: number) => StyleSheet.create({
     height: logoSize,
   },
   title: {
+    fontFamily: Fonts.display,
     fontSize: 26,
     fontWeight: 'bold',
     color: colors.text,
@@ -563,6 +565,7 @@ const getStyles = (colors: any, logoSize: number) => StyleSheet.create({
     marginBottom: 15,
   },
   modalTitle: {
+    fontFamily: Fonts.display,
     fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,

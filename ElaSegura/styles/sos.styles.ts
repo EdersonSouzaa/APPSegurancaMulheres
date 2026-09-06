@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { Fonts } from '../constants/globalFont';
 
 export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   // Botão SOS grande com brilho (usado na confirmação e no estado ativo)
@@ -63,6 +64,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     marginBottom: 36,
   },
   promptTitle: {
+    fontFamily: Fonts.display,
     fontSize: 25,
     fontWeight: 'bold',
     color: colors.text,
@@ -186,6 +188,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     padding: 24,
   },
   flowTitle: {
+    fontFamily: Fonts.display,
     fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,

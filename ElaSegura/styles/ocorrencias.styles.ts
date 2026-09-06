@@ -1,4 +1,5 @@
 import { Platform, StyleSheet } from 'react-native';
+import { Fonts } from '../constants/globalFont';
 
 export const getStyles = (isDarkMode: boolean, colors: any) =>
   StyleSheet.create({
@@ -14,6 +15,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
       paddingBottom: 20,
     },
     headerTitle: {
+      fontFamily: Fonts.display,
       fontSize: 22,
       fontWeight: 'bold',
       color: colors.text,
@@ -214,6 +216,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
       marginBottom: 20,
     },
     emptyTitle: {
+      fontFamily: Fonts.display,
       fontSize: 20,
       fontWeight: 'bold',
       color: colors.text,
@@ -246,6 +249,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
       marginBottom: 20,
     },
     modalTitle: {
+      fontFamily: Fonts.display,
       fontSize: 20,
       fontWeight: 'bold',
       color: colors.text,

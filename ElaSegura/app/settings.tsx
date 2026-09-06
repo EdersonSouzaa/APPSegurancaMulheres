@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Fonts } from '../constants/globalFont';
 import {
   View,
   Text,
@@ -733,6 +734,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTitle: {
+    fontFamily: Fonts.display,
     fontSize: 21,
     fontWeight: 'bold',
   },
@@ -940,6 +942,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
+    fontFamily: Fonts.display,
     fontSize: 20,
     fontWeight: 'bold',
   },

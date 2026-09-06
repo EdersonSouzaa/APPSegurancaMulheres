@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { Fonts } from '../constants/globalFont';
 
 export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
@@ -75,6 +76,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     borderColor: colors.background,
   },
   userName: {
+    fontFamily: Fonts.display,
     fontSize: 21,
     fontWeight: 'bold',
     color: colors.text,

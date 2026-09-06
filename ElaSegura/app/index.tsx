@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { Fonts } from '../constants/globalFont';
 import {
   View,
   Text,
@@ -229,6 +230,7 @@ const getStyles = (metrics: Metrics, colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.primary,
   },
   title: {
+    fontFamily: Fonts.display,
     fontSize: metrics.titleSize,
     fontWeight: 'bold',
     color: colors.text,

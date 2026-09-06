@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { Fonts } from '../constants/globalFont';
 
 export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
@@ -84,6 +85,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     letterSpacing: 0.2,
   },
   headerName: {
+    fontFamily: Fonts.display,
     fontSize: 18,
     fontWeight: '800',
     color: colors.text,
@@ -135,6 +137,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     marginBottom: 15,
   },
   sectionTitle: {
+    fontFamily: Fonts.display,
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,

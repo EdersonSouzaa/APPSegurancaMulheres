@@ -1,11 +1,27 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput } from 'react-native';
 
+// Quicksand é a fonte de corpo: geométrica de pontas arredondadas, combina com
+// o rosa e os cantos arredondados do app sem perder legibilidade.
 const FONT_MAP = {
-  regular: 'Poppins_400Regular',
-  medium: 'Poppins_500Medium',
-  semibold: 'Poppins_600SemiBold',
-  bold: 'Poppins_700Bold',
+  regular: 'Quicksand_400Regular',
+  medium: 'Quicksand_500Medium',
+  semibold: 'Quicksand_600SemiBold',
+  bold: 'Quicksand_700Bold',
+} as const;
+
+/**
+ * Fonte de destaque, usada só nos títulos grandes de cada tela.
+ *
+ * O applyGlobalFont() abaixo injeta a Quicksand como padrão, mas o style de
+ * quem chama tem precedência — então basta espalhar `fontFamily: Fonts.display`
+ * no style do título para ele sair com a Fraunces.
+ *
+ * Não use no corpo do texto: a Fraunces é serifada e perde legibilidade em
+ * tamanhos pequenos, o que importa nas telas de SOS e alertas.
+ */
+export const Fonts = {
+  display: 'Fraunces_700Bold',
 } as const;
 
 const flattenFontWeight = (style: any): string | number | undefined => {

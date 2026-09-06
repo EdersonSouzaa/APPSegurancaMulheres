@@ -1,4 +1,5 @@
 import React from 'react';
+import { Fonts } from '../constants/globalFont';
 import {
   View,
   Text,
@@ -167,6 +168,7 @@ const getStyles = (colors: any, circleSize: number) => StyleSheet.create({
     alignItems: 'center',
   },
   appNameText: {
+    fontFamily: Fonts.display,
     fontSize: 32,
     fontWeight: '800',
     color: colors.text,

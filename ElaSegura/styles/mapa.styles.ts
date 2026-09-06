@@ -1,4 +1,5 @@
 import { StyleSheet, Platform, StatusBar } from 'react-native';
+import { Fonts } from '../constants/globalFont';
 
 export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   container: {
@@ -21,6 +22,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     gap: 12,
   },
   headerTitle: {
+    fontFamily: Fonts.display,
     fontSize: 22,
     fontWeight: 'bold',
     color: colors.text,

@@ -21,17 +21,20 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { entrar, registrar, recuperarSenha, mensagemErroAuth } from '../services/auth';
 import { sincronizarSessao } from '../services/session';
 import { SuccessPopup } from '../components/SuccessPopup';
-import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../constants/theme';
 
 const LOGO_IMAGE = require('../assets/images/logo.png');
+
+// A tela de login/cadastro fica SEMPRE no tema claro, mesmo que a pessoa ja
+// tenha escolhido o tema escuro nas configuracoes. Por isso aqui nao usamos o
+// useTheme() — as cores vem fixas de Colors.light.
+const LIGHT_COLORS = Colors.light;
 
 type AuthTab = 'login' | 'cadastro';
 
 export default function Login() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const { isDarkMode, theme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<AuthTab>(params.tab === 'cadastro' ? 'cadastro' : 'login');
 
@@ -56,10 +59,10 @@ export default function Login() {
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
 
-  const colors = Colors[theme];
+  const colors = LIGHT_COLORS;
   const { width } = useWindowDimensions();
   const logoSize = Math.min(width * 0.32, 140);
-  const styles = useMemo(() => getStyles(isDarkMode, colors, logoSize), [isDarkMode, colors, logoSize]);
+  const styles = useMemo(() => getStyles(colors, logoSize), [colors, logoSize]);
 
   const switchTab = (tab: AuthTab) => {
     setActiveTab(tab);
@@ -154,7 +157,7 @@ export default function Login() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       <SuccessPopup
         visible={isSuccessVisible}
@@ -399,7 +402,7 @@ export default function Login() {
   );
 }
 
-const getStyles = (isDarkMode: boolean, colors: any, logoSize: number) => StyleSheet.create({
+const getStyles = (colors: any, logoSize: number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -441,7 +444,7 @@ const getStyles = (isDarkMode: boolean, colors: any, logoSize: number) => StyleS
   },
   tabSwitcher: {
     flexDirection: 'row',
-    backgroundColor: isDarkMode ? '#252525' : '#F2E3EA',
+    backgroundColor: '#F2E3EA',
     borderRadius: 16,
     padding: 4,
     marginBottom: 24,
@@ -481,7 +484,7 @@ const getStyles = (isDarkMode: boolean, colors: any, logoSize: number) => StyleS
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: isDarkMode ? '#252525' : '#F8F8F8',
+    backgroundColor: '#F8F8F8',
     borderRadius: 14,
     marginBottom: 16,
     paddingHorizontal: 16,
@@ -573,7 +576,7 @@ const getStyles = (isDarkMode: boolean, colors: any, logoSize: number) => StyleS
   modalInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: isDarkMode ? '#252525' : '#F8F8F8',
+    backgroundColor: '#F8F8F8',
     borderRadius: 12,
     marginBottom: 20,
     paddingHorizontal: 16,

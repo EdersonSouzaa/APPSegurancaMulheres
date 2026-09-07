@@ -639,46 +639,20 @@ const Home = () => {
                 <Text style={{ textAlign: 'center', marginTop: 20, color: colors.secondary }}>Nenhuma ocorrência encontrada.</Text>
               ) : (
                 occurrences.map((item) => (
-                  <View key={`${item.source}-${item.id}`} style={styles.occurrenceCard}>
-                    <View style={styles.occurrenceIconBox}>
-                      <MaterialCommunityIcons
-                        name={item.source === 'sos' ? 'shield-alert' : 'alert-circle'}
-                        size={30}
-                        color={item.source === 'sos' ? '#FF5252' : colors.primary}
-                      />
-                    </View>
-                    <View style={styles.occurrenceInfo}>
-                      <Text style={styles.occurrenceTitle} numberOfLines={1}>{item.title}</Text>
-                      <Text style={styles.occurrenceDescription} numberOfLines={2}>{item.description}</Text>
-                      <View style={styles.occurrenceCardFooter}>
-                        <View style={styles.occurrenceTimeRow}>
-                          <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
-                          <Text style={styles.occurrenceTime} numberOfLines={1}>{formatAlertTime(item.created_at)}</Text>
-                        </View>
-                        <View style={styles.occurrenceActionsRow}>
-                          <TouchableOpacity
-                            style={styles.occurrenceActionButton}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                            onPress={() => {
-                              setModalVisible(false);
-                              openEditOccurrence(item);
-                            }}
-                          >
-                            <MaterialCommunityIcons name="pencil-outline" size={19} color={colors.primary} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.occurrenceActionButton, styles.occurrenceActionButtonDanger]}
-                            activeOpacity={0.7}
-                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                            onPress={() => handleDeleteOccurrence(item)}
-                          >
-                            <MaterialCommunityIcons name="trash-can-outline" size={19} color="#E53935" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
+                  <OccurrenceCard
+                    key={`${item.source}-${item.id}`}
+                    styles={styles}
+                    colors={colors}
+                    title={item.title}
+                    description={item.description}
+                    time={formatAlertTime(item.created_at)}
+                    source={item.source}
+                    onEdit={() => {
+                      setModalVisible(false);
+                      openEditOccurrence(item);
+                    }}
+                    onDelete={() => handleDeleteOccurrence(item)}
+                  />
                 ))
               )}
               <View style={{ height: 20 }} />
@@ -864,37 +838,35 @@ const OccurrenceCard = ({ title, description, time, source, styles, colors, onEd
     <View style={styles.occurrenceInfo}>
       <Text style={styles.occurrenceTitle} numberOfLines={1}>{title}</Text>
       <Text style={styles.occurrenceDescription} numberOfLines={2}>{description}</Text>
-      <View style={styles.occurrenceCardFooter}>
-        <View style={styles.occurrenceTimeRow}>
-          <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
-          <Text style={styles.occurrenceTime} numberOfLines={1}>{time}</Text>
-        </View>
-        {(onEdit || onDelete) && (
-          <View style={styles.occurrenceActionsRow}>
-            {onEdit && (
-              <TouchableOpacity
-                style={styles.occurrenceActionButton}
-                activeOpacity={0.7}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={onEdit}
-              >
-                <MaterialCommunityIcons name="pencil-outline" size={19} color={colors.primary} />
-              </TouchableOpacity>
-            )}
-            {onDelete && (
-              <TouchableOpacity
-                style={[styles.occurrenceActionButton, styles.occurrenceActionButtonDanger]}
-                activeOpacity={0.7}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={onDelete}
-              >
-                <MaterialCommunityIcons name="trash-can-outline" size={19} color="#E53935" />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+      <View style={styles.occurrenceTimeRow}>
+        <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
+        <Text style={styles.occurrenceTime} numberOfLines={1}>{time}</Text>
       </View>
     </View>
+    {(onEdit || onDelete) && (
+      <View style={styles.occurrenceActionsRow}>
+        {onEdit && (
+          <TouchableOpacity
+            style={styles.occurrenceActionButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={onEdit}
+          >
+            <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+        {onDelete && (
+          <TouchableOpacity
+            style={[styles.occurrenceActionButton, styles.occurrenceActionButtonDanger]}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={onDelete}
+          >
+            <MaterialCommunityIcons name="trash-can-outline" size={18} color="#E53935" />
+          </TouchableOpacity>
+        )}
+      </View>
+    )}
   </View>
 );
 

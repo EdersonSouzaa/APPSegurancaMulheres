@@ -112,12 +112,14 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
       paddingHorizontal: 20,
       paddingBottom: 100,
     },
+    // Tres colunas: icone | conteudo | acoes. Os botoes saiam da coluna de
+    // conteudo, disputando linha com a data num rodape com flexWrap.
     occurrenceCard: {
       backgroundColor: colors.cardBackground,
       borderRadius: 25,
       padding: 18,
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       marginBottom: 15,
       elevation: 3,
       shadowColor: '#000',
@@ -136,6 +138,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
     },
     occurrenceInfo: {
       flex: 1,
+      minWidth: 0,
       gap: 8,
     },
     occurrenceTitle: {
@@ -170,14 +173,6 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
       color: colors.primary,
       flexShrink: 1,
     },
-    occurrenceBottomRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      rowGap: 8,
-      columnGap: 10,
-    },
     occurrenceTimeRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -186,13 +181,15 @@ export const getStyles = (isDarkMode: boolean, colors: any) =>
     },
     occurrenceActionsRow: {
       flexDirection: 'row',
-      gap: 10,
+      alignItems: 'center',
+      gap: 8,
+      marginLeft: 12,
       flexShrink: 0,
     },
     cardActionButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 14,
+      width: 34,
+      height: 34,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: isDarkMode ? colors.accent : '#F5F5F7',

@@ -425,33 +425,31 @@ const filteredOccurrences = useMemo(() => {
                   </Text>
                 </View>
 
-                <View style={styles.occurrenceBottomRow}>
-                  <View style={styles.occurrenceTimeRow}>
-                    <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
-                    <Text style={styles.occurrenceTime} numberOfLines={1}>
-                      {item.time}
-                    </Text>
-                  </View>
-
-                  <View style={styles.occurrenceActionsRow}>
-                    <TouchableOpacity
-                      style={styles.cardActionButton}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      onPress={() => openEditModal(item)}
-                    >
-                      <MaterialCommunityIcons name="pencil-outline" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.cardActionButton, styles.cardActionButtonDanger]}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      onPress={() => handleDeleteOccurrence(item)}
-                    >
-                      <MaterialCommunityIcons name="trash-can-outline" size={20} color="#E53935" />
-                    </TouchableOpacity>
-                  </View>
+                <View style={styles.occurrenceTimeRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
+                  <Text style={styles.occurrenceTime} numberOfLines={1}>
+                    {item.time}
+                  </Text>
                 </View>
+              </View>
+
+              <View style={styles.occurrenceActionsRow}>
+                <TouchableOpacity
+                  style={styles.cardActionButton}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  onPress={() => openEditModal(item)}
+                >
+                  <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.cardActionButton, styles.cardActionButtonDanger]}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  onPress={() => handleDeleteOccurrence(item)}
+                >
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color="#E53935" />
+                </TouchableOpacity>
               </View>
             </View>
           ))

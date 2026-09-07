@@ -226,12 +226,15 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     marginBottom: 6,
   },
 
+  // Três colunas: ícone | conteúdo | ações. Antes os botões viviam dentro da
+  // coluna de conteúdo, num rodapé com flexWrap, disputando a mesma linha da
+  // data — e a linha só cabia por poucos pixels no modal, mais estreito.
   occurrenceCard: {
     backgroundColor: colors.cardBackground,
     borderRadius: 25,
     padding: 18,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
   },
   occurrenceIconBox: {
@@ -258,25 +261,26 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     color: colors.secondary,
     flexShrink: 1,
   },
-  occurrenceInfo: { flex: 1, gap: 6 },
-  occurrenceTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  occurrenceCardFooter: {
+  // minWidth 0 deixa a coluna encolher de verdade: sem isso o conteúdo empurra
+  // as ações para fora do card quando o título ou a data são longos.
+  occurrenceInfo: { flex: 1, minWidth: 0, gap: 5 },
+  occurrenceTimeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    rowGap: 6,
-    columnGap: 10,
+    gap: 4,
+    marginTop: 2,
   },
   occurrenceActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 12,
     flexShrink: 0,
   },
   occurrenceActionButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: isDarkMode ? colors.accent : '#F5F5F7',

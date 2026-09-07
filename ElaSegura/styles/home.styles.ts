@@ -236,6 +236,15 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    // Borda + sombra porque o modal "Últimas Ocorrências" usa o mesmo
+    // cardBackground do card: sem contorno, era branco sobre branco.
+    borderWidth: 1,
+    borderColor: colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   occurrenceIconBox: {
     width: 50,

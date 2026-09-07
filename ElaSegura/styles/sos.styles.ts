@@ -3,7 +3,13 @@ import { Fonts } from '../constants/globalFont';
 
 export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create({
   // Botão SOS grande com brilho (usado na confirmação e no estado ativo)
+  // O tamanho aqui precisa ser explicito. O maior filho e o sosGlowOuter, de
+  // 230x230, mas ele e position:absolute e nao entra no calculo de layout —
+  // sem width/height o wrapper media so os 160 do botao e o brilho vazava 35px
+  // para cada lado, colidindo com o titulo acima e o status abaixo.
   sosGlowWrapper: {
+    width: 230,
+    height: 230,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -75,11 +81,16 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     color: colors.secondary,
     lineHeight: 23,
   },
+  // Mesmo caso do sosGlowWrapper: sem altura explicita o brilho de 230 vazava
+  // para fora. As margens caem porque o proprio box agora reserva esse espaco.
   holdWrapper: {
+    width: 230,
+    height: 230,
+    alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 28,
-    marginBottom: 64,
+    marginTop: 8,
+    marginBottom: 30,
   },
   holdButtonText: {
     color: '#FFFFFF',
@@ -186,6 +197,7 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     flexGrow: 1,
     alignItems: 'center',
     padding: 24,
+    paddingBottom: 36,
   },
   flowTitle: {
     fontFamily: Fonts.display,
@@ -228,19 +240,11 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     letterSpacing: 1,
     marginTop: 5,
   },
-  cancelAlertLink: {
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  cancelAlertLinkText: {
-    color: colors.secondary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
 
   // Lista de contatos notificados
   contactsList: {
     width: '100%',
+    marginBottom: 8,
   },
   contactRow: {
     flexDirection: 'row',
@@ -302,7 +306,8 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
 
   // Estado ativo: botão SOS grande
   activeSosWrapper: {
-    marginBottom: 20,
+    marginTop: 4,
+    marginBottom: 24,
   },
   activeSosButtonText: {
     color: '#FFFFFF',
@@ -333,37 +338,96 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
     color: colors.secondary,
     fontWeight: '600',
   },
-  quickActionsRow: {
+  // Acao principal da tela ativa: card largo, em vez de um bloco de 1/3.
+  activeActionCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 28,
-    gap: 12,
-  },
-  quickActionButton: {
-    flex: 1,
-    backgroundColor: colors.cardBackground,
-    borderRadius: 18,
-    paddingVertical: 16,
     alignItems: 'center',
-    elevation: 2,
+    width: '100%',
+    backgroundColor: colors.cardBackground,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
-  quickActionIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
+  activeActionIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
     backgroundColor: isDarkMode ? colors.accent : '#FFF0F2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginRight: 14,
   },
-  quickActionLabel: {
-    fontSize: 11,
+  activeActionLabel: {
+    fontSize: 15,
     fontWeight: '700',
     color: colors.text,
-    textAlign: 'center',
+  },
+  activeActionHint: {
+    fontSize: 12,
+    color: colors.secondary,
+    marginTop: 3,
+  },
+
+  // Ligar para emergencia: mesmo peso visual do botao da tela inicial.
+  activeEmergencyWrapper: {
+    width: '100%',
+    borderRadius: 20,
+    marginTop: 4,
+    marginBottom: 14,
+    elevation: 6,
+    shadowColor: '#B71C1C',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+  },
+  activeEmergencyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    padding: 16,
+  },
+  activeEmergencyIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  activeEmergencyText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  activeEmergencySubtext: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 12,
+    marginTop: 3,
+  },
+
+  // Cancelar o SOS. Era um link de texto cinza; virou botao de largura cheia,
+  // porque alarme falso e comum e a saida precisa estar visivel.
+  cancelSosButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    borderRadius: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.cardBackground,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
+  cancelSosButtonText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });

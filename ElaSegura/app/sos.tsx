@@ -262,8 +262,13 @@ const SOSScreen = () => {
             )}
           </View>
 
-          <TouchableOpacity style={styles.cancelAlertLink} onPress={handleCancelAlert}>
-            <Text style={styles.cancelAlertLinkText}>Cancelar alerta</Text>
+          <TouchableOpacity
+            style={[styles.cancelSosButton, { marginTop: 24 }]}
+            activeOpacity={0.85}
+            onPress={handleCancelAlert}
+          >
+            <MaterialCommunityIcons name="close-circle-outline" size={20} color={colors.primary} />
+            <Text style={styles.cancelSosButtonText}>Cancelar alerta SOS</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -294,29 +299,16 @@ const SOSScreen = () => {
             <Text style={styles.activeStatusText}>Alertando seu círculo de confiança · {formatSeconds(elapsedSeconds)}</Text>
           </View>
 
-          <View style={styles.quickActionsRow}>
-            <QuickActionButton
-              styles={styles}
-              icon="crosshairs-gps"
-              label="Compartilhar local"
-              color={colors.primary}
-              onPress={handleShareLocation}
-            />
-            <QuickActionButton
-              styles={styles}
-              icon="microphone-outline"
-              label="Gravar áudio"
-              color={colors.primary}
-              onPress={() => Alert.alert('Em breve', 'A gravação de áudio estará disponível em breve.')}
-            />
-            <QuickActionButton
-              styles={styles}
-              icon="video-outline"
-              label="Vídeo"
-              color={colors.primary}
-              onPress={() => Alert.alert('Em breve', 'A gravação de vídeo estará disponível em breve.')}
-            />
-          </View>
+          <TouchableOpacity style={styles.activeActionCard} activeOpacity={0.85} onPress={handleShareLocation}>
+            <View style={styles.activeActionIconBox}>
+              <MaterialCommunityIcons name="crosshairs-gps" size={22} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activeActionLabel}>Compartilhar localização</Text>
+              <Text style={styles.activeActionHint}>Envie sua posição em tempo real</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={colors.secondary} />
+          </TouchableOpacity>
 
           <View style={styles.contactsList}>
             {semContatos ? (
@@ -345,12 +337,30 @@ const SOSScreen = () => {
           </View>
 
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, paddingVertical: 6 }}
-            activeOpacity={0.8}
+            style={styles.activeEmergencyWrapper}
+            activeOpacity={0.85}
             onPress={() => setEmergencyVisible(true)}
           >
-            <MaterialCommunityIcons name="phone-alert" size={18} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 15, marginLeft: 6 }}>Ligar para emergência</Text>
+            <LinearGradient
+              colors={['#E53935', '#B71C1C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.activeEmergencyButton}
+            >
+              <View style={styles.activeEmergencyIconBox}>
+                <MaterialCommunityIcons name="phone-alert" size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.activeEmergencyText}>Ligar para emergência</Text>
+                <Text style={styles.activeEmergencySubtext}>Polícia, SAMU e mais</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.cancelSosButton} activeOpacity={0.85} onPress={handleCancelAlert}>
+            <MaterialCommunityIcons name="close-circle-outline" size={20} color={colors.primary} />
+            <Text style={styles.cancelSosButtonText}>Cancelar alerta SOS</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -570,14 +580,5 @@ const SosGlowButton = ({ styles, colors, onPress, subtext }: any) => {
     </View>
   );
 };
-
-const QuickActionButton = ({ icon, label, color, onPress, styles }: any) => (
-  <TouchableOpacity style={styles.quickActionButton} activeOpacity={0.8} onPress={onPress}>
-    <View style={styles.quickActionIconBox}>
-      <MaterialCommunityIcons name={icon} size={20} color={color} />
-    </View>
-    <Text style={styles.quickActionLabel}>{label}</Text>
-  </TouchableOpacity>
-);
 
 export default SOSScreen;

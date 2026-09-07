@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { I18nProvider } from '@/context/I18nContext';
+import { ConexaoProvider } from '@/context/ConexaoContext';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { ThemeProvider as NavigationThemeProvider, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import {
@@ -15,8 +18,33 @@ import { Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import { applyGlobalFont } from '@/constants/globalFont';
 import { observarAuth } from '@/services/auth';
 import { sincronizarSessao, limparSessao } from '@/services/session';
+import { lerDisfarce } from '@/lib/preferencias';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/**
+ * Manda o app para a calculadora quando o modo disfarce está ligado.
+ *
+ * Roda uma única vez por abertura, controlado pelo ref: depois que a usuária
+ * digita o PIN e entra, navegar entre telas não pode jogá-la de volta para o
+ * disfarce. Sair para o disfarce de novo é uma ação explícita, feita em
+ * Configurações.
+ */
+function useDisfarceNaAbertura(pronto: boolean) {
+  const router = useRouter();
+  const jaDecidiu = useRef(false);
+
+  useEffect(() => {
+    if (!pronto || jaDecidiu.current) return;
+    jaDecidiu.current = true;
+
+    lerDisfarce()
+      .then((config) => {
+        if (config.ativo && config.pin) router.replace('/calculadora');
+      })
+      .catch(() => {});
+  }, [pronto, router]);
+}
 
 function RootLayoutContent() {
   const { isDarkMode } = useTheme();
@@ -35,7 +63,11 @@ function RootLayoutContent() {
         <Stack.Screen name="index" />
         <Stack.Screen name="home" />
         <Stack.Screen name="perfil" />
+        <Stack.Screen name="onboarding" />
+        {/* Gesto de voltar desligado: sair do disfarce é só pelo PIN. */}
+        <Stack.Screen name="calculadora" options={{ gestureEnabled: false }} />
       </Stack>
+      <OfflineBanner />
     </NavigationThemeProvider>
   );
 }
@@ -48,13 +80,17 @@ export default function RootLayout() {
     Quicksand_700Bold,
     Fraunces_700Bold,
   });
+  const [montado, setMontado] = useState(false);
 
   useEffect(() => {
     if (fontsLoaded) {
       applyGlobalFont();
       SplashScreen.hideAsync().catch(() => {});
+      setMontado(true);
     }
   }, [fontsLoaded]);
+
+  useDisfarceNaAbertura(montado);
 
   // O Firebase restaura a sessão sozinho ao abrir o app, mas as telas leem
   // nome/foto e o gate de login do AsyncStorage. Este listener mantém as duas
@@ -80,9 +116,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <RootLayoutContent />
-      </ThemeProvider>
+      <I18nProvider>
+        <ThemeProvider>
+          <ConexaoProvider>
+            <RootLayoutContent />
+          </ConexaoProvider>
+        </ThemeProvider>
+      </I18nProvider>
     </SafeAreaProvider>
   );
 }

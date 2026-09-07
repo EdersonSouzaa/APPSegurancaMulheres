@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
+import { useI18n } from '@/context/I18nContext';
 import { Colors } from '@/constants/theme';
 import { BackHomeButton } from '@/components/BackHomeButton';
 
@@ -22,6 +23,7 @@ const LOGO_IMAGE = require('../assets/images/logo.png');
 
 export default function About() {
   const { isDarkMode, theme } = useTheme();
+  const { t } = useI18n();
   const { width } = useWindowDimensions();
 
   // Cores dinâmicas para esta tela
@@ -59,7 +61,9 @@ export default function About() {
       {/* Navbar fixa no topo */}
       <View style={styles.navbar}>
         <BackHomeButton to="/perfil" />
-        <Text style={styles.navbarTitle}>Sobre o App</Text>
+        <Text style={styles.navbarTitle} accessibilityRole="header">
+          {t('sobre.titulo')}
+        </Text>
         {/* View vazia apenas para centralizar o título perfeitamente */}
         <View style={{ width: 42 }} />
       </View>
@@ -77,40 +81,41 @@ export default function About() {
             <Text style={[styles.appNameText, { color: colors.primary }]}>Segura</Text>
             <MaterialCommunityIcons name="heart" size={24} color={colors.purple} style={{ marginLeft: 5 }} />
           </View>
-          <Text style={styles.tagline}>Sua segurança é importante</Text>
+          <Text style={styles.tagline}>{t('sobre.subtitulo')}</Text>
         </View>
 
         <View style={styles.mainCard}>
-          <Text style={styles.missionTitle}>Nossa Missão</Text>
-          <Text style={styles.description}>
-            Cuidar e proteger mulheres através da tecnologia e da comunidade.
-            Acreditamos que toda mulher tem o direito de transitar com confiança e segurança.
+          <Text style={styles.missionTitle} accessibilityRole="header">
+            {t('sobre.missaoTitulo')}
           </Text>
+          <Text style={styles.description}>{t('sobre.missaoTexto')}</Text>
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>Como funcionamos</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            {t('sobre.comoTitulo')}
+          </Text>
 
           <FeatureRow
             icon="target-account"
-            title="Botão SOS Instantâneo"
-            description="Envio de localização em tempo real para contatos de confiança."
+            title={t('sobre.f1Titulo')}
+            description={t('sobre.f1Texto')}
           />
           <FeatureRow
             icon="map-marker-path"
-            title="Caminho Seguro"
-            description="Visualize avaliações da comunidade sobre a segurança das ruas."
+            title={t('sobre.f2Titulo')}
+            description={t('sobre.f2Texto')}
           />
           <FeatureRow
             icon="account-group-outline"
-            title="Rede de Apoio"
-            description="Conecte-se com outras usuárias para compartilhar rotas."
+            title={t('sobre.f3Titulo')}
+            description={t('sobre.f3Texto')}
           />
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.version}>Versão 1.0.0</Text>
-          <Text style={styles.madeWith}>Desenvolvido para sua proteção.</Text>
+          <Text style={styles.version}>{t('sobre.versao')}</Text>
+          <Text style={styles.madeWith}>{t('sobre.rodape')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

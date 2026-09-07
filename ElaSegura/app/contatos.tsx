@@ -18,8 +18,11 @@ import { getStyles } from '../styles/contatos.styles';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { Colors } from '../constants/theme';
-import { api } from '../services/api';
+import { haptics } from '../lib/haptics';
+import { listarContatos, criarContato, atualizarContato, excluirContato } from '../services/contatos';
+import { auth } from '../services/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ToastNotification } from '../components/ToastNotification';
 import { BackHomeButton } from '../components/BackHomeButton';
@@ -63,15 +66,12 @@ const formatarTelefone = (texto: string) => {
   return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
 };
 
-const DELEGACIA_CONTATO = {
-  id: -1,
-  name: 'Delegacia da Mulher',
-  phone: '180',
-  subtitle: '180 · Central de Atendimento',
-};
+/** Linha fixa de emergência pública — não é um contato da usuária. */
+const DELEGACIA_TELEFONE = '180';
 
 export default function Contatos() {
   const { isDarkMode, theme } = useTheme();
+  const { t } = useI18n();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
@@ -103,19 +103,20 @@ export default function Contatos() {
 
   const fetchContatos = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
+      if (!auth.currentUser) {
         router.replace('/login');
         return;
       }
-      const data = await api.get('/contatos', token);
-      setContatos(Array.isArray(data) ? data : []);
+      setContatos(await listarContatos());
     } catch (error: any) {
       console.error('Error fetching contatos:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os contatos.');
+      Alert.alert(t('comum.erro'), error?.message ?? t('contatos.erroCarregar'));
     } finally {
       setLoading(false);
     }
+    // t é estável dentro de um idioma; recriar o callback a cada render
+    // dispararia o useFocusEffect em loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Recarrega toda vez que a tela ganha foco, não só na montagem: ao voltar
@@ -128,51 +129,54 @@ export default function Contatos() {
 
   const handleSave = async () => {
     if (!name || !phone) {
-      Alert.alert('Aviso', 'Preencha todos os campos.');
+      haptics.aviso();
+      Alert.alert(t('comum.atencao'), t('contatos.preenchaCampos'));
       return;
     }
+    haptics.acao();
     try {
-      const token = await AsyncStorage.getItem('userToken');
       if (editingContato) {
-        await api.put(`/contatos/${editingContato.id}`, { name, phone, emergencial }, token || undefined);
+        await atualizarContato(editingContato.id, { name, phone, emergencial });
+        showToast(t('contatos.salvo'), 'success');
       } else {
-        await api.post('/contatos', { name, phone, emergencial }, token || undefined);
-        showToast('Contato adicionado com sucesso! 💜', 'success');
+        await criarContato(name, phone, emergencial);
+        showToast(t('contatos.adicionado'), 'success');
       }
+      haptics.sucesso();
       setModalVisible(false);
       resetForm();
       fetchContatos();
     } catch (error: any) {
-      Alert.alert('Erro', 'Ocorreu um erro ao salvar o contato.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), error?.message ?? t('contatos.erroSalvar'));
     }
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert(
-      'Confirmar',
-      'Deseja realmente excluir este contato?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = await AsyncStorage.getItem('userToken');
-              await api.delete(`/contatos/${id}`, token || undefined);
-              setModalVisible(false);
-              showToast('Contato excluído com sucesso! 🗑️', 'danger');
-              fetchContatos();
-            } catch (error: any) {
-              Alert.alert('Erro', 'Erro ao excluir contato.');
-            }
+    haptics.aviso();
+    Alert.alert(t('contatos.confirmar'), t('contatos.excluirPergunta'), [
+      { text: t('comum.cancelar'), style: 'cancel' },
+      {
+        text: t('comum.excluir'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await excluirContato(id);
+            setModalVisible(false);
+            haptics.sucesso();
+            showToast(t('contatos.excluido'), 'danger');
+            fetchContatos();
+          } catch (error: any) {
+            haptics.erro();
+            Alert.alert(t('comum.erro'), error?.message ?? t('contatos.erroExcluir'));
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   const openEditModal = (contato: Contato) => {
+    haptics.toque();
     setEditingContato(contato);
     setName(contato.name);
     // Contatos salvos antes da máscara aparecem já formatados na edição.
@@ -189,10 +193,15 @@ export default function Contatos() {
   };
 
   const callContact = async (phoneNumber: string, contactName: string) => {
+    haptics.acao();
     try {
       await Linking.openURL(`tel:${phoneNumber}`);
     } catch {
-      Alert.alert('Não foi possível ligar', `Tente ligar manualmente para ${contactName} (${phoneNumber}).`);
+      haptics.erro();
+      Alert.alert(
+        t('contatos.naoFoiPossivelLigar'),
+        t('contatos.ligueManualmente', { nome: contactName, telefone: phoneNumber })
+      );
     }
   };
 
@@ -203,30 +212,33 @@ export default function Contatos() {
       {/* Cabeçalho */}
       <View style={styles.header}>
         <BackHomeButton />
-        <Text style={styles.headerTitle}>Contatos</Text>
+        <Text style={styles.headerTitle} accessibilityRole="header">
+          {t('contatos.titulo')}
+        </Text>
         <TouchableOpacity
           style={styles.addButton}
           activeOpacity={0.8}
           onPress={() => {
+            haptics.toque();
             resetForm();
             setModalVisible(true);
           }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.adicionarContato')}
         >
           <MaterialIcons name="add" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.headerSubtitle}>
-        Essas pessoas serão avisadas na hora quando você acionar o SOS.
-      </Text>
+      <Text style={styles.headerSubtitle}>{t('contatos.subtitulo')}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
       ) : contatos.length === 0 ? (
         <View style={styles.emptyStateContainer}>
           <MaterialIcons name="account-circle" size={100} color={isDarkMode ? colors.secondary : "#1A1A1A"} />
-          <Text style={styles.emptyStateTitle}>Nenhum contato adicionado</Text>
-          <Text style={styles.emptyStateText}>Adicione contatos de confiança para enviar alertas</Text>
+          <Text style={styles.emptyStateTitle}>{t('contatos.vazioTitulo')}</Text>
+          <Text style={styles.emptyStateText}>{t('contatos.vazioTexto')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
@@ -236,6 +248,8 @@ export default function Contatos() {
               style={styles.contactItem}
               activeOpacity={0.8}
               onPress={() => openEditModal(item)}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.editarContato', { nome: item.name })}
             >
               <View style={[styles.contactAvatar, { backgroundColor: CONTACT_COLORS[index % CONTACT_COLORS.length] }]}>
                 <Text style={styles.contactAvatarText}>{item.name.charAt(0).toUpperCase()}</Text>
@@ -246,12 +260,14 @@ export default function Contatos() {
               </View>
               {item.emergencial && (
                 <View style={styles.principalBadge}>
-                  <Text style={styles.principalBadgeText}>PRINCIPAL</Text>
+                  <Text style={styles.principalBadgeText}>{t('contatos.principal')}</Text>
                 </View>
               )}
               <TouchableOpacity
                 style={styles.callButton}
                 onPress={(e) => { e.stopPropagation(); callContact(item.phone, item.name); }}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.ligarPara', { nome: item.name })}
               >
                 <MaterialIcons name="call" size={18} color="#2E7D32" />
               </TouchableOpacity>
@@ -264,12 +280,14 @@ export default function Contatos() {
               <MaterialCommunityIcons name="shield-alert" size={20} color="#FFF" />
             </View>
             <View style={styles.contactInfo}>
-              <Text style={styles.contactName} numberOfLines={1}>{DELEGACIA_CONTATO.name}</Text>
-              <Text style={styles.contactPhone}>{DELEGACIA_CONTATO.subtitle}</Text>
+              <Text style={styles.contactName} numberOfLines={1}>{t('contatos.delegacia')}</Text>
+              <Text style={styles.contactPhone}>{t('contatos.delegaciaSub')}</Text>
             </View>
             <TouchableOpacity
               style={styles.callButton}
-              onPress={() => callContact(DELEGACIA_CONTATO.phone, DELEGACIA_CONTATO.name)}
+              onPress={() => callContact(DELEGACIA_TELEFONE, t('contatos.delegacia'))}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.ligarPara', { nome: t('contatos.delegacia') })}
             >
               <MaterialIcons name="call" size={18} color="#2E7D32" />
             </TouchableOpacity>
@@ -286,18 +304,19 @@ export default function Contatos() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingContato ? 'Editar Contato' : 'Novo Contato'}
+            <Text style={styles.modalTitle} accessibilityRole="header">
+              {editingContato ? t('contatos.editarContato') : t('contatos.novoContato')}
             </Text>
 
             <View style={styles.inputField}>
               <MaterialCommunityIcons name="account-outline" size={18} color={colors.primary} style={styles.inputFieldIcon} />
               <TextInput
                 style={styles.inputFieldText}
-                placeholder="Nome do contato"
+                placeholder={t('contatos.nomeContato')}
                 placeholderTextColor={colors.secondary}
                 value={name}
                 onChangeText={setName}
+                accessibilityLabel={t('contatos.nomeContato')}
               />
             </View>
 
@@ -311,16 +330,21 @@ export default function Contatos() {
                 onChangeText={(texto) => setPhone(formatarTelefone(texto))}
                 keyboardType="phone-pad"
                 maxLength={TELEFONE_MAX}
+                accessibilityLabel={t('contatos.telefone')}
               />
             </View>
 
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Contato principal (SOS)</Text>
+              <Text style={styles.switchLabel}>{t('contatos.contatoPrincipal')}</Text>
               <Switch
                 value={emergencial}
-                onValueChange={setEmergencial}
+                onValueChange={(v) => {
+                  haptics.selecao();
+                  setEmergencial(v);
+                }}
                 trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor={'#FFF'}
+                accessibilityLabel={t('contatos.contatoPrincipal')}
               />
             </View>
 
@@ -328,22 +352,31 @@ export default function Contatos() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('comum.cancelar')}
               >
-                <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancelar</Text>
+                <Text style={[styles.buttonText, styles.cancelButtonText]}>{t('comum.cancelar')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleSave}
+                accessibilityRole="button"
+                accessibilityLabel={t('comum.salvar')}
               >
-                <Text style={[styles.buttonText, styles.saveButtonText]}>Salvar</Text>
+                <Text style={[styles.buttonText, styles.saveButtonText]}>{t('comum.salvar')}</Text>
               </TouchableOpacity>
             </View>
 
             {editingContato && (
-              <TouchableOpacity style={styles.deleteLink} onPress={() => handleDelete(editingContato.id)}>
+              <TouchableOpacity
+                style={styles.deleteLink}
+                onPress={() => handleDelete(editingContato.id)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.excluirContato', { nome: editingContato.name })}
+              >
                 <MaterialIcons name="delete-outline" size={18} color="#E53935" />
-                <Text style={styles.deleteLinkText}>Excluir contato</Text>
+                <Text style={styles.deleteLinkText}>{t('contatos.excluirContato')}</Text>
               </TouchableOpacity>
             )}
           </View>

@@ -7,9 +7,11 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { getStyles } from '../styles/sos.styles';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { Colors } from '../constants/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
+import { haptics } from '../lib/haptics';
+import { acionarSos } from '../services/sos';
+import type { ContatoApp } from '../services/contatos';
 import { EmergencyCallSheet } from '../components/EmergencyCallSheet';
 import { CircularProgress } from '../components/CircularProgress';
 import { BackHomeButton } from '../components/BackHomeButton';
@@ -28,18 +30,19 @@ type Phase = 'confirm' | 'sending' | 'active';
 const SOSScreen = () => {
   const router = useRouter();
   const { isDarkMode, theme } = useTheme();
+  const { t } = useI18n();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   const [phase, setPhase] = useState<Phase>('confirm');
   const [isLoading, setIsLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [contatosNotificados, setContatosNotificados] = useState<any[]>([]);
+  const [contatosNotificados, setContatosNotificados] = useState<ContatoApp[]>([]);
   const [semContatos, setSemContatos] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [emergencyVisible, setEmergencyVisible] = useState(false);
 
-  const [addressText, setAddressText] = useState('Obtendo localização...');
+  const [addressText, setAddressText] = useState('');
 
   const cancelledRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,16 +73,18 @@ const SOSScreen = () => {
   }, [phase, elapsedSeconds]);
 
   useEffect(() => {
+    setAddressText(t('sos.obtendoLocalizacao'));
+
     (async () => {
       try {
         if (Platform.OS === 'web') {
-          setAddressText('Disponível no aplicativo mobile');
+          setAddressText(t('sos.somenteMobile'));
           return;
         }
 
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setAddressText('Ative a localização para ver seu endereço');
+          setAddressText(t('sos.ativeLocalizacao'));
           return;
         }
 
@@ -87,7 +92,7 @@ const SOSScreen = () => {
           (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
 
         if (!loc) {
-          setAddressText('Não foi possível obter sua localização');
+          setAddressText(t('sos.naoObteveLocalizacao'));
           return;
         }
 
@@ -100,38 +105,48 @@ const SOSScreen = () => {
           const street = [place.street, place.streetNumber].filter(Boolean).join(', ');
           const area = [place.district, place.city].filter(Boolean).join(' — ');
           const label = [street, area].filter(Boolean).join(' — ');
-          setAddressText(label || 'Endereço não encontrado');
+          setAddressText(label || t('sos.enderecoNaoEncontrado'));
         } else {
-          setAddressText('Endereço não encontrado');
+          setAddressText(t('sos.enderecoNaoEncontrado'));
         }
       } catch {
-        setAddressText('Não foi possível obter o endereço');
+        setAddressText(t('sos.naoObteveEndereco'));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const callContact = async (contact: any) => {
+  const callContact = async (contact: ContatoApp) => {
+    haptics.acao();
     try {
       await Linking.openURL(`tel:${contact.phone}`);
     } catch {
-      Alert.alert('Não foi possível ligar', `Tente ligar manualmente para ${contact.name} (${contact.phone}).`);
+      haptics.erro();
+      Alert.alert(
+        t('sos.naoFoiPossivelLigar'),
+        t('sos.ligueManualmente', { nome: contact.name, telefone: contact.phone })
+      );
     }
   };
 
   const handleShareLocation = async () => {
     if (!currentCoords) {
-      Alert.alert('Localização indisponível', 'Ainda estamos obtendo sua localização.');
+      haptics.aviso();
+      Alert.alert(t('sos.localizacaoIndisponivel'), t('sos.aindaObtendo'));
       return;
     }
+    haptics.acao();
     const url = `https://maps.google.com/?q=${currentCoords.latitude},${currentCoords.longitude}`;
     try {
-      await Share.share({ message: `📍 Esta é minha localização em tempo real:\n${url}\n— Enviado pelo ElaSegura` });
+      await Share.share({ message: t('sos.mensagemLocalizacao', { url }) });
     } catch {
-      Alert.alert('Erro', 'Não foi possível compartilhar a localização.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), t('sos.erroCompartilhar'));
     }
   };
 
   const handleCancelAlert = () => {
+    haptics.aviso();
     cancelledRef.current = true;
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -144,6 +159,9 @@ const SOSScreen = () => {
   };
 
   const triggerSOSAlert = async () => {
+    // Três batidas fortes: a confirmação de que o alerta saiu, sentida com o
+    // telefone no bolso ou na mão fechada, quando olhar a tela não é opção.
+    haptics.emergencia();
     cancelledRef.current = false;
     setContatosNotificados([]);
     setSemContatos(false);
@@ -157,7 +175,7 @@ const SOSScreen = () => {
 
     try {
       let coords: { latitude: number; longitude: number } | null = null;
-      let locationString = 'Localização não disponível';
+      let locationString: string | null = null;
 
       if (Platform.OS === 'web') {
         await new Promise<void>((resolve) => {
@@ -192,10 +210,7 @@ const SOSScreen = () => {
       if (cancelledRef.current) return;
       if (coords) setCurrentCoords(coords);
 
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) return;
-
-      const response = await api.post('/sos', { location: locationString }, token);
+      const response = await acionarSos(locationString);
       if (cancelledRef.current) return;
 
       const contatos = response.contatosEmergencia || [];
@@ -220,29 +235,33 @@ const SOSScreen = () => {
           <TouchableOpacity style={styles.flowBackButton} onPress={handleCancelAlert}>
             <MaterialIcons name="arrow-back" size={22} color={colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.flowHeaderTitle}>Suporte a caminho</Text>
+          <Text style={styles.flowHeaderTitle} accessibilityRole="header">
+            {t('sos.suporteACaminho')}
+          </Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.flowTitle}>Estamos enviando{'\n'}ajuda para você</Text>
-          <Text style={styles.flowSubtitle}>
-            Não se preocupe — seu círculo de confiança será avisado em instantes.
+          <Text style={styles.flowTitle} accessibilityLiveRegion="assertive">
+            {t('sos.enviandoAjuda')}
           </Text>
+          <Text style={styles.flowSubtitle}>{t('sos.enviandoSubtitulo')}</Text>
 
           <SendingRing
             styles={styles}
             colors={colors}
             isDarkMode={isDarkMode}
             remaining={Math.max(1, SEND_DURATION - elapsedSeconds)}
+            rotuloSegundo={t('sos.segundo')}
+            rotuloSegundos={t('sos.segundos')}
           />
 
           <View style={styles.contactsList}>
             {contatosNotificados.length === 0 ? (
               <Text style={{ textAlign: 'center', color: colors.secondary, fontSize: 13 }}>
-                {isLoading ? 'Avisando seu círculo de confiança...' : 'Nenhum contato emergencial cadastrado.'}
+                {isLoading ? t('sos.avisandoCirculo') : t('sos.semContatoCadastrado')}
               </Text>
             ) : (
-              contatosNotificados.map((c: any, index: number) => (
+              contatosNotificados.map((c, index) => (
                 <View key={c.id} style={styles.contactRow}>
                   <View style={[styles.contactAvatar, { backgroundColor: CONTACT_COLORS[index % CONTACT_COLORS.length] }]}>
                     <Text style={styles.contactAvatarText}>{c.name.charAt(0).toUpperCase()}</Text>
@@ -251,10 +270,15 @@ const SOSScreen = () => {
                     <Text style={styles.contactName}>{c.name}</Text>
                     <View style={styles.contactStatusRow}>
                       <View style={styles.contactStatusDot} />
-                      <Text style={styles.contactStatusText}>Notificando...</Text>
+                      <Text style={styles.contactStatusText}>{t('sos.notificando')}</Text>
                     </View>
                   </View>
-                  <TouchableOpacity style={styles.contactCallButton} onPress={() => callContact(c)}>
+                  <TouchableOpacity
+                    style={styles.contactCallButton}
+                    onPress={() => callContact(c)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('a11y.ligarPara', { nome: c.name })}
+                  >
                     <MaterialIcons name="call" size={18} color="#FFF" />
                   </TouchableOpacity>
                 </View>
@@ -266,9 +290,11 @@ const SOSScreen = () => {
             style={[styles.cancelSosButton, { marginTop: 24 }]}
             activeOpacity={0.85}
             onPress={handleCancelAlert}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.cancelarSos')}
           >
             <MaterialCommunityIcons name="close-circle-outline" size={20} color={colors.primary} />
-            <Text style={styles.cancelSosButtonText}>Cancelar alerta SOS</Text>
+            <Text style={styles.cancelSosButtonText}>{t('sos.cancelarAlerta')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -284,28 +310,40 @@ const SOSScreen = () => {
           <TouchableOpacity style={styles.flowBackButton} onPress={handleCancelAlert}>
             <MaterialIcons name="arrow-back" size={22} color={colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.flowHeaderTitle}>Acesso de emergência</Text>
+          <Text style={styles.flowHeaderTitle} accessibilityRole="header">
+            {t('sos.acessoEmergencia')}
+          </Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.flowTitle}>Fique calma.{'\n'}A ajuda está a caminho.</Text>
+          <Text style={styles.flowTitle} accessibilityLiveRegion="polite">
+            {t('sos.fiqueCalma')}
+          </Text>
 
           <View style={styles.activeSosWrapper}>
-            <SosGlowButton styles={styles} colors={colors} subtext="ENVIANDO..." />
+            <SosGlowButton styles={styles} colors={colors} subtext={t('sos.enviando')} />
           </View>
 
           <View style={styles.activeStatusRow}>
             <View style={styles.activeStatusDot} />
-            <Text style={styles.activeStatusText}>Alertando seu círculo de confiança · {formatSeconds(elapsedSeconds)}</Text>
+            <Text style={styles.activeStatusText} accessibilityLiveRegion="polite">
+              {t('sos.alertandoCirculo', { tempo: formatSeconds(elapsedSeconds) })}
+            </Text>
           </View>
 
-          <TouchableOpacity style={styles.activeActionCard} activeOpacity={0.85} onPress={handleShareLocation}>
+          <TouchableOpacity
+            style={styles.activeActionCard}
+            activeOpacity={0.85}
+            onPress={handleShareLocation}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.compartilharLocal')}
+          >
             <View style={styles.activeActionIconBox}>
               <MaterialCommunityIcons name="crosshairs-gps" size={22} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.activeActionLabel}>Compartilhar localização</Text>
-              <Text style={styles.activeActionHint}>Envie sua posição em tempo real</Text>
+              <Text style={styles.activeActionLabel}>{t('sos.compartilharLocalizacao')}</Text>
+              <Text style={styles.activeActionHint}>{t('sos.envieSuaPosicao')}</Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={colors.secondary} />
           </TouchableOpacity>
@@ -313,10 +351,10 @@ const SOSScreen = () => {
           <View style={styles.contactsList}>
             {semContatos ? (
               <Text style={{ textAlign: 'center', color: colors.secondary, fontSize: 13 }}>
-                Nenhum contato emergencial cadastrado. Adicione contatos na aba Contatos.
+                {t('sos.semContatoAba')}
               </Text>
             ) : (
-              contatosNotificados.map((c: any, index: number) => (
+              contatosNotificados.map((c, index) => (
                 <View key={c.id} style={styles.contactRow}>
                   <View style={[styles.contactAvatar, { backgroundColor: CONTACT_COLORS[index % CONTACT_COLORS.length] }]}>
                     <Text style={styles.contactAvatarText}>{c.name.charAt(0).toUpperCase()}</Text>
@@ -325,10 +363,17 @@ const SOSScreen = () => {
                     <Text style={styles.contactName}>{c.name}</Text>
                     <View style={styles.contactStatusRow}>
                       <View style={styles.contactStatusDot} />
-                      <Text style={styles.contactStatusText}>{index === 0 ? 'Notificada agora' : 'Ligando...'}</Text>
+                      <Text style={styles.contactStatusText}>
+                        {index === 0 ? t('sos.notificadaAgora') : t('sos.ligando')}
+                      </Text>
                     </View>
                   </View>
-                  <TouchableOpacity style={styles.contactCallButton} onPress={() => callContact(c)}>
+                  <TouchableOpacity
+                    style={styles.contactCallButton}
+                    onPress={() => callContact(c)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('a11y.ligarPara', { nome: c.name })}
+                  >
                     <MaterialIcons name="call" size={18} color="#FFF" />
                   </TouchableOpacity>
                 </View>
@@ -339,7 +384,12 @@ const SOSScreen = () => {
           <TouchableOpacity
             style={styles.activeEmergencyWrapper}
             activeOpacity={0.85}
-            onPress={() => setEmergencyVisible(true)}
+            onPress={() => {
+              haptics.toque();
+              setEmergencyVisible(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.ligarEmergencia')}
           >
             <LinearGradient
               colors={['#E53935', '#B71C1C']}
@@ -351,16 +401,22 @@ const SOSScreen = () => {
                 <MaterialCommunityIcons name="phone-alert" size={22} color="#FFFFFF" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.activeEmergencyText}>Ligar para emergência</Text>
-                <Text style={styles.activeEmergencySubtext}>Polícia, SAMU e mais</Text>
+                <Text style={styles.activeEmergencyText}>{t('sos.ligarEmergencia')}</Text>
+                <Text style={styles.activeEmergencySubtext}>{t('sos.policiaSamu')}</Text>
               </View>
               <MaterialIcons name="chevron-right" size={22} color="#FFFFFF" />
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.cancelSosButton} activeOpacity={0.85} onPress={handleCancelAlert}>
+          <TouchableOpacity
+            style={styles.cancelSosButton}
+            activeOpacity={0.85}
+            onPress={handleCancelAlert}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.cancelarSos')}
+          >
             <MaterialCommunityIcons name="close-circle-outline" size={20} color={colors.primary} />
-            <Text style={styles.cancelSosButtonText}>Cancelar alerta SOS</Text>
+            <Text style={styles.cancelSosButtonText}>{t('sos.cancelarAlerta')}</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -382,10 +438,10 @@ const SOSScreen = () => {
         </View>
 
         <View style={styles.promptTitleWrap}>
-          <Text style={styles.promptTitle}>Precisa de ajuda agora?</Text>
-          <Text style={styles.promptSubtitle}>
-            Toque no botão para acionar o SOS. Seu círculo de confiança será avisado na hora.
+          <Text style={styles.promptTitle} accessibilityRole="header">
+            {t('sos.precisaAjuda')}
           </Text>
+          <Text style={styles.promptSubtitle}>{t('sos.toqueParaAcionar')}</Text>
         </View>
 
         <View style={styles.holdWrapper}>
@@ -402,7 +458,13 @@ const SOSScreen = () => {
               },
             ]}
           />
-          <TouchableOpacity activeOpacity={0.85} onPress={triggerSOSAlert}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={triggerSOSAlert}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.acionarSos')}
+            accessibilityHint={t('a11y.acionarSosDica')}
+          >
             <LinearGradient
               colors={[colors.primary, '#C2185B']}
               start={{ x: 0, y: 0 }}
@@ -414,7 +476,16 @@ const SOSScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.emergencyCallButtonWrapper} activeOpacity={0.85} onPress={() => setEmergencyVisible(true)}>
+        <TouchableOpacity
+          style={styles.emergencyCallButtonWrapper}
+          activeOpacity={0.85}
+          onPress={() => {
+            haptics.toque();
+            setEmergencyVisible(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.ligarEmergencia')}
+        >
           <LinearGradient
             colors={['#E53935', '#B71C1C']}
             start={{ x: 0, y: 0 }}
@@ -425,8 +496,8 @@ const SOSScreen = () => {
               <MaterialCommunityIcons name="phone-alert" size={22} color="#FFFFFF" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.emergencyCallButtonText}>Ligar para emergência</Text>
-              <Text style={styles.emergencyCallButtonSubtext}>Polícia, SAMU e mais</Text>
+              <Text style={styles.emergencyCallButtonText}>{t('sos.ligarEmergencia')}</Text>
+              <Text style={styles.emergencyCallButtonSubtext}>{t('sos.policiaSamu')}</Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color="#FFFFFF" />
           </LinearGradient>
@@ -437,7 +508,7 @@ const SOSScreen = () => {
             <MaterialIcons name="location-on" size={20} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.promptLocationLabel}>Sua localização atual</Text>
+            <Text style={styles.promptLocationLabel}>{t('sos.suaLocalizacao')}</Text>
             <Text style={styles.promptLocationValue}>{addressText}</Text>
           </View>
         </View>
@@ -455,7 +526,7 @@ const SOSScreen = () => {
  * um halo que respira atrás dele e o número que dá uma batidinha a cada segundo
  * em vez de trocar seco.
  */
-const SendingRing = ({ styles, colors, isDarkMode, remaining }: any) => {
+const SendingRing = ({ styles, colors, isDarkMode, remaining, rotuloSegundo, rotuloSegundos }: any) => {
   const entrada = useRef(new Animated.Value(0)).current;
   const halo = useRef(new Animated.Value(0)).current;
   const digito = useRef(new Animated.Value(1)).current;
@@ -531,7 +602,7 @@ const SendingRing = ({ styles, colors, isDarkMode, remaining }: any) => {
         <Animated.Text style={[styles.progressCountdown, { transform: [{ scale: digito }] }]}>
           {remaining}
         </Animated.Text>
-        <Text style={styles.progressLabel}>{remaining === 1 ? 'SEGUNDO' : 'SEGUNDOS'}</Text>
+        <Text style={styles.progressLabel}>{remaining === 1 ? rotuloSegundo : rotuloSegundos}</Text>
       </CircularProgress>
     </Animated.View>
   );

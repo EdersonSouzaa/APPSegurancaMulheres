@@ -5,26 +5,24 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { getStyles } from '../styles/alertas.styles';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { Colors } from '../constants/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
+import { obterAlertas, type AlertaFeed } from '../services/alertas';
 import { BackHomeButton } from '../components/BackHomeButton';
 
 const AlertasScreen = () => {
   const { isDarkMode, theme } = useTheme();
+  const { t, locale } = useI18n();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<AlertaFeed[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        const data = await api.get('/alertas', token);
-        setAlerts(data.alerts || []);
-      }
+      const data = await obterAlertas();
+      setAlerts(data.alerts || []);
     } catch (error) {
       console.error('Erro ao carregar alertas:', error);
     } finally {
@@ -38,11 +36,11 @@ const AlertasScreen = () => {
     }, [fetchAlerts])
   );
 
-  const formatAlertTime = (iso: string) => {
+  const formatAlertTime = (iso: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
-    const day = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
-    const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const day = d.toLocaleDateString(locale, { day: '2-digit', month: 'long' });
+    const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     return `${day}, ${time}`;
   };
 
@@ -54,9 +52,11 @@ const AlertasScreen = () => {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <BackHomeButton style={{ marginRight: 15 }} to="/perfil" />
-          <Text style={styles.title}>Alertas</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            {t('alertas.titulo')}
+          </Text>
         </View>
-        <Text style={styles.subtitle}>Histórico de alertas e ocorrências</Text>
+        <Text style={styles.subtitle}>{t('alertas.subtitulo')}</Text>
       </View>
 
       {loading ? (
@@ -69,10 +69,8 @@ const AlertasScreen = () => {
           <View style={styles.emptyStateIconBox}>
             <MaterialCommunityIcons name="bell-off-outline" size={60} color={colors.primary} />
           </View>
-          <Text style={styles.emptyStateTitle}>Tudo tranquilo por aqui</Text>
-          <Text style={styles.emptyStateDescription}>
-            Nenhum alerta SOS ou ocorrência registrada até o momento.
-          </Text>
+          <Text style={styles.emptyStateTitle}>{t('alertas.vazioTitulo')}</Text>
+          <Text style={styles.emptyStateDescription}>{t('alertas.vazioTexto')}</Text>
         </View>
       ) : (
         /* Alerts List */
@@ -92,7 +90,7 @@ const AlertasScreen = () => {
                     <Text style={styles.alertTitle}>{item.title}</Text>
                     {item.user_name && (
                       <Text style={{ fontSize: 11, color: colors.secondary, fontStyle: 'italic' }}>
-                        Por: {item.user_name}
+                        {t('alertas.por', { nome: item.user_name })}
                       </Text>
                     )}
                   </View>

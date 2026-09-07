@@ -24,15 +24,21 @@ import { router } from 'expo-router';
 import { BackHomeButton } from '../components/BackHomeButton';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { Colors } from '../constants/theme';
+import { haptics } from '../lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../services/api';
+import { obterPerfil, atualizarPerfil, atualizarFoto } from '../services/usuario';
+import { listarContatos } from '../services/contatos';
+import { obterAlertas } from '../services/alertas';
 import { sair } from '../services/auth';
 import { limparSessao } from '../services/session';
+import { limparCache } from '../services/cacheOffline';
+import { auth } from '../services/firebase';
 
-const formatMemberSince = (createdAt: string) => {
+const formatMemberSince = (createdAt: string, locale: string) => {
   const date = new Date(createdAt);
-  const label = date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+  const label = date.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
   return label.replace('.', '');
 };
 
@@ -47,11 +53,11 @@ const formatProtectedDuration = (createdAt: string) => {
 
 export default function Perfil() {
   const { isDarkMode, theme } = useTheme();
+  const { t, locale } = useI18n();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   const [userData, setUserData] = useState({ name: '', email: '', profile_picture: null as string | null, created_at: null as string | null });
-  const [token, setToken] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -81,8 +87,6 @@ export default function Perfil() {
   const loadUserData = useCallback(async () => {
     try {
       const savedUser = await AsyncStorage.getItem('user');
-      const savedToken = await AsyncStorage.getItem('userToken');
-      if (savedToken) setToken(savedToken);
 
       if (savedUser) {
         const userObj = JSON.parse(savedUser);
@@ -94,17 +98,17 @@ export default function Perfil() {
         });
       }
 
-      if (savedToken) {
-        const me = await api.get('/user/me', savedToken);
+      if (auth.currentUser) {
+        const me = await obterPerfil();
         if (me) {
           setUserData((prev) => ({ ...prev, created_at: me.created_at || prev.created_at }));
         }
 
         const [contatos, alertas] = await Promise.all([
-          api.get('/contatos', savedToken).catch(() => []),
-          api.get('/alertas', savedToken).catch(() => ({ alerts: [] })),
+          listarContatos().catch(() => []),
+          obterAlertas().catch(() => ({ alerts: [], summary: null } as any)),
         ]);
-        setContatosCount(Array.isArray(contatos) ? contatos.length : 0);
+        setContatosCount(contatos.length);
         setAlertasCount(alertas?.alerts?.length || 0);
       }
     } catch (error) {
@@ -136,7 +140,8 @@ export default function Perfil() {
       setUserData({ ...userData, profile_picture: base64Image });
 
       try {
-        await api.put('/user/profile-picture', { profile_picture: base64Image }, token);
+        await atualizarFoto(base64Image);
+        haptics.sucesso();
 
         const savedUser = await AsyncStorage.getItem('user');
         if (savedUser) {
@@ -146,12 +151,14 @@ export default function Perfil() {
         }
       } catch (error) {
         console.error('Erro ao salvar foto:', error);
-        Alert.alert('Erro', 'Não foi possível atualizar a foto.');
+        haptics.erro();
+        Alert.alert(t('comum.erro'), t('perfil.erroFoto'));
       }
     }
   };
 
   const openEditModal = () => {
+    haptics.toque();
     setEditName(userData.name);
     setEditEmail(userData.email);
     setEditModalVisible(true);
@@ -159,12 +166,14 @@ export default function Perfil() {
 
   const handleSaveEdit = async () => {
     if (!editName.trim() || !editEmail.trim()) {
-      Alert.alert('Aviso', 'Nome e e-mail são obrigatórios.');
+      haptics.aviso();
+      Alert.alert(t('comum.atencao'), t('perfil.camposObrigatorios'));
       return;
     }
+    haptics.acao();
     setIsSaving(true);
     try {
-      const updated = await api.put('/user/update', { name: editName.trim(), email: editEmail.trim() }, token);
+      const updated = await atualizarPerfil(editName.trim(), editEmail.trim());
       const savedUser = await AsyncStorage.getItem('user');
       if (savedUser) {
         const userObj = JSON.parse(savedUser);
@@ -172,17 +181,19 @@ export default function Perfil() {
       }
       setUserData((prev) => ({ ...prev, name: updated.name, email: updated.email }));
       setEditModalVisible(false);
+      haptics.sucesso();
 
       // O Firebase não troca o e-mail de login sem confirmação: ele envia um
       // link para o novo endereço e só efetiva depois do clique.
       if (updated.emailPendenteConfirmacao) {
         Alert.alert(
-          'Confirme o novo e-mail',
-          `Enviamos um link de confirmação para ${editEmail.trim()}. Seu e-mail de login só muda depois que você clicar nele.`
+          t('perfil.confirmeNovoEmail'),
+          t('perfil.confirmeEmailTexto', { email: editEmail.trim() })
         );
       }
     } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Não foi possível salvar as alterações.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), error.message || t('perfil.erroSalvar'));
     } finally {
       setIsSaving(false);
     }
@@ -197,8 +208,15 @@ export default function Perfil() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <BackHomeButton />
-          <Text style={styles.headerTitle}>Perfil</Text>
-          <TouchableOpacity style={styles.headerButton} onPress={openEditModal}>
+          <Text style={styles.headerTitle} accessibilityRole="header">
+            {t('perfil.titulo')}
+          </Text>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={openEditModal}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.editarPerfil')}
+          >
             <MaterialCommunityIcons name="pencil-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
         </View>
@@ -212,18 +230,26 @@ export default function Perfil() {
                 <Text style={styles.avatarInitial}>{userInitial}</Text>
               )}
             </View>
-            <TouchableOpacity style={styles.cameraBadge} onPress={pickImage} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.cameraBadge}
+              onPress={pickImage}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.trocarFoto')}
+            >
               <MaterialCommunityIcons name="camera" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.userName}>{userData.name || 'Usuária'}</Text>
-          <Text style={styles.userEmail}>{userData.email || 'carregando...'}</Text>
+          <Text style={styles.userName}>{userData.name || t('perfil.usuaria')}</Text>
+          <Text style={styles.userEmail}>{userData.email || t('perfil.carregando')}</Text>
 
           {userData.created_at && (
             <View style={styles.memberBadge}>
               <MaterialCommunityIcons name="calendar-outline" size={14} color={colors.primary} />
-              <Text style={styles.memberBadgeText}>Membro desde {formatMemberSince(userData.created_at)}</Text>
+              <Text style={styles.memberBadgeText}>
+                {t('perfil.membroDesde', { data: formatMemberSince(userData.created_at, locale) })}
+              </Text>
             </View>
           )}
         </View>
@@ -231,17 +257,17 @@ export default function Perfil() {
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{contatosCount}</Text>
-            <Text style={styles.statLabel}>Contatos</Text>
+            <Text style={styles.statLabel}>{t('perfil.contatos')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{alertasCount}</Text>
-            <Text style={styles.statLabel}>Alertas</Text>
+            <Text style={styles.statLabel}>{t('perfil.alertas')}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{userData.created_at ? formatProtectedDuration(userData.created_at) : '-'}</Text>
-            <Text style={styles.statLabel}>Protegida</Text>
+            <Text style={styles.statLabel}>{t('perfil.protegida')}</Text>
           </View>
         </View>
 
@@ -251,8 +277,8 @@ export default function Perfil() {
             icon="account-outline"
             iconColor="#F35F74"
             iconTint={isDarkMode ? '#F35F7433' : '#FFF0F2'}
-            title="Informações pessoais"
-            subtitle="Nome e e-mail"
+            title={t('perfil.infoPessoais')}
+            subtitle={t('perfil.infoPessoaisSub')}
             onPress={openEditModal}
           />
           <MenuRow
@@ -260,8 +286,8 @@ export default function Perfil() {
             icon="heart-outline"
             iconColor="#7C4DFF"
             iconTint={isDarkMode ? '#7C4DFF33' : '#EDE7F6'}
-            title="Contatos de emergência"
-            subtitle="Gerencie sua rede de confiança"
+            title={t('perfil.contatosEmergencia')}
+            subtitle={t('perfil.contatosEmergenciaSub')}
             onPress={() => router.push('/contatos')}
           />
           <MenuRow
@@ -269,8 +295,8 @@ export default function Perfil() {
             icon="history"
             iconColor="#2196F3"
             iconTint={isDarkMode ? '#2196F333' : '#E3F2FD'}
-            title="Histórico de atividade"
-            subtitle="Alertas e registros"
+            title={t('perfil.historico')}
+            subtitle={t('perfil.historicoSub')}
             onPress={() => router.push('/alertas' as any)}
           />
           <MenuRow
@@ -278,8 +304,8 @@ export default function Perfil() {
             icon="lock-outline"
             iconColor="#4CAF50"
             iconTint={isDarkMode ? '#4CAF5033' : '#E8F5E9'}
-            title="Privacidade e segurança"
-            subtitle="Senha e controle de dados"
+            title={t('perfil.privacidade')}
+            subtitle={t('perfil.privacidadeSub')}
             onPress={() => router.push('/settings')}
           />
           <MenuRow
@@ -287,8 +313,8 @@ export default function Perfil() {
             icon="help-circle-outline"
             iconColor="#FF9800"
             iconTint={isDarkMode ? '#FF980033' : '#FFF3E0'}
-            title="Sobre o App"
-            subtitle="Objetivo e finalidade do app"
+            title={t('perfil.sobreApp')}
+            subtitle={t('perfil.sobreAppSub')}
             onPress={() => router.push('/about')}
           />
         </View>
@@ -297,16 +323,23 @@ export default function Perfil() {
           style={styles.logoutButtonWrapper}
           activeOpacity={0.85}
           onPress={async () => {
+            haptics.aviso();
             // signOut encerra a sessão no Firebase; limpar só o AsyncStorage
             // deixaria a usuária autenticada por baixo dos panos.
+            const uid = auth.currentUser?.uid ?? null;
             try {
               await sair();
             } catch (e) {
               console.error('Erro ao sair:', e);
             }
             await limparSessao();
+            // O cache offline guarda contatos e ocorrências desta usuária: ele
+            // não pode sobreviver ao logout num aparelho compartilhado.
+            await limparCache(uid);
             router.replace('/login');
           }}
+          accessibilityRole="button"
+          accessibilityLabel={t('perfil.sair')}
         >
           <View
             style={styles.logoutButton}
@@ -337,7 +370,7 @@ export default function Perfil() {
               />
             </Animated.View>
             <MaterialCommunityIcons name="logout" size={20} color="#FFFFFF" />
-            <Text style={styles.logoutText}>Sair da conta</Text>
+            <Text style={styles.logoutText}>{t('perfil.sair')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -353,33 +386,41 @@ export default function Perfil() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Informações pessoais</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+              <Text style={styles.modalTitle} accessibilityRole="header">
+                {t('perfil.infoPessoais')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
+              >
                 <MaterialIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nome</Text>
+              <Text style={styles.label}>{t('perfil.nome')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Seu Nome"
+                placeholder={t('perfil.nomePlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={editName}
                 onChangeText={setEditName}
+                accessibilityLabel={t('perfil.nome')}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>{t('perfil.email')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="seu@email.com"
+                placeholder={t('perfil.emailPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={editEmail}
                 onChangeText={setEditEmail}
+                accessibilityLabel={t('perfil.email')}
               />
             </View>
 
@@ -388,10 +429,13 @@ export default function Perfil() {
               activeOpacity={0.8}
               disabled={isSaving}
               onPress={handleSaveEdit}
+              accessibilityRole="button"
+              accessibilityLabel={t('perfil.salvarAlteracoes')}
+              accessibilityState={{ disabled: isSaving, busy: isSaving }}
             >
               {isSaving
                 ? <ActivityIndicator color="#FFF" size="small" />
-                : <Text style={styles.saveButtonText}>Salvar Alterações</Text>
+                : <Text style={styles.saveButtonText}>{t('perfil.salvarAlteracoes')}</Text>
               }
             </TouchableOpacity>
           </View>
@@ -402,7 +446,13 @@ export default function Perfil() {
 }
 
 const MenuRow = ({ icon, iconColor, iconTint, title, subtitle, onPress, styles }: any) => (
-  <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.menuRow}
+    activeOpacity={0.7}
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={`${title}. ${subtitle}`}
+  >
     <View style={[styles.menuIconBox, { backgroundColor: iconTint }]}>
       <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
     </View>

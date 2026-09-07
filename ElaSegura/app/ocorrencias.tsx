@@ -1,13 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Location from 'expo-location';
-import { api } from '../services/api';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StatusBar,
   Text,
@@ -19,589 +18,666 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { getStyles } from '../styles/ocorrencias.styles';
 import { ToastNotification } from '../components/ToastNotification';
 import { BackHomeButton } from '../components/BackHomeButton';
 import { SuccessPopup } from '../components/SuccessPopup';
+import { ValidacaoRelato } from '../components/ValidacaoRelato';
+import { haptics } from '../lib/haptics';
+import { useLocation } from '../hooks/use-location';
+import {
+  listarOcorrencias,
+  listarOcorrenciasProximas,
+  criarOcorrencia,
+  atualizarOcorrencia,
+  excluirOcorrencia,
+  type OcorrenciaApp,
+  type OcorrenciaTipo,
+  type PeriodoFiltro,
+} from '../services/ocorrencias';
+import { meusVotos, type Voto } from '../services/validacoes';
+import { auth } from '../services/firebase';
 
-type OccurrenceType = 'error' | 'warning';
-type TabType = 'gerais' | 'proximas';
+type Aba = 'proximas' | 'minhas';
 
-type Occurrence = {
-  /**
-   * String quando o registro veio do Firestore (id do documento) e número
-   * negativo quando é só local, ainda não sincronizado.
-   */
-  id: string | number;
-  title: string;
-  desc: string;
-  time: string;
-  type: OccurrenceType;
-  distance: number;
-  /** true quando o registro existe no servidor (foi criado com sucesso via API) */
-  synced?: boolean;
-};
+const RAIOS = [500, 1000, 2000, 5000];
 
-const initialOccurrences: Occurrence[] = [];
-
-const occurrenceTypes: { label: string; value: OccurrenceType; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-  { label: 'Emergencia', value: 'error', icon: 'error' },
-  { label: 'Atencao', value: 'warning', icon: 'warning' },
+const PERIODOS: { valor: PeriodoFiltro; chave: 'mapa.periodo7' | 'mapa.periodo30' | 'mapa.periodo90' | 'mapa.periodoTudo' }[] = [
+  { valor: '7d', chave: 'mapa.periodo7' },
+  { valor: '30d', chave: 'mapa.periodo30' },
+  { valor: '90d', chave: 'mapa.periodo90' },
+  { valor: 'tudo', chave: 'mapa.periodoTudo' },
 ];
+
+const CATEGORIAS = ['catAssedio', 'catRoubo', 'catSuspeita', 'catOutro'] as const;
+
+function formatarDistancia(metros?: number) {
+  if (metros == null) return null;
+  return metros >= 1000 ? `${(metros / 1000).toFixed(1)}km` : `${Math.round(metros)}m`;
+}
 
 export default function Ocorrencias() {
   const { isDarkMode, theme } = useTheme();
+  const { t, locale } = useI18n();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
+  const { coords } = useLocation();
 
-  const [occurrences, setOccurrences] = useState(initialOccurrences);
-  const userIdRef = useRef<string | number | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('proximas');
-  const [radiusFilter, setRadiusFilter] = useState(1000);
+  const [ocorrencias, setOcorrencias] = useState<OcorrenciaApp[]>([]);
+  const [votos, setVotos] = useState<Record<string, Voto>>({});
+  const [carregando, setCarregando] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
+
+  const [aba, setAba] = useState<Aba>('proximas');
+  const [raio, setRaio] = useState(1000);
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>('30d');
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todos');
+
   const [modalVisible, setModalVisible] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState<OccurrenceType>('error');
-  const [distance, setDistance] = useState<number>(500);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('Todos');
-  const [editingId, setEditingId] = useState<string | number | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [titulo, setTitulo] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [tipo, setTipo] = useState<OcorrenciaTipo>('error');
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'danger'>('success');
-
+  const [toastType, setToastType] = useState<'success' | 'danger' | 'info'>('success');
   const [editSuccessVisible, setEditSuccessVisible] = useState(false);
 
-  const showToast = async (message: string, type: 'success' | 'danger') => {
-    try {
-      const isEnabledVal = await AsyncStorage.getItem('@notifications_enabled');
-      const notificationsEnabled = isEnabledVal === null ? true : isEnabledVal === 'true';
-      if (notificationsEnabled) {
-        setToastMessage(message);
-        setToastType(type);
-        setToastVisible(true);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const uid = auth.currentUser?.uid ?? null;
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const savedUser = await AsyncStorage.getItem('user');
-        let activeUserId: string | number | null = null;
-        if (savedUser) {
-          const user = JSON.parse(savedUser);
-          activeUserId = user.id;
-          userIdRef.current = user.id;
-        }
-        
-        const key = activeUserId ? `@occurrences_data_${activeUserId}` : '@occurrences_data';
-        const storedData = await AsyncStorage.getItem(key);
-        if (storedData) {
-          setOccurrences(JSON.parse(storedData));
-        } else {
-          setOccurrences([]);
-        }
-      } catch (e) {
-        console.error('Failed to load occurrences', e);
-      }
-    };
-    loadData();
+  const showToast = useCallback((mensagem: string, tipoToast: 'success' | 'danger' | 'info') => {
+    setToastMessage(mensagem);
+    setToastType(tipoToast);
+    setToastVisible(true);
   }, []);
 
-  const saveOccurrences = async (newOccurrences: Occurrence[], activeUserId?: string | number | null) => {
+  /**
+   * Carrega a lista da aba ativa.
+   *
+   * "Próximas" traz o que a comunidade registrou em volta — é a aba onde a
+   * validação faz sentido. "Meus relatos" traz só o que a usuária escreveu, e
+   * é a única onde editar e excluir aparecem.
+   */
+  const carregar = useCallback(async () => {
     try {
-      const idToUse = activeUserId !== undefined ? activeUserId : userIdRef.current;
-      const key = idToUse ? `@occurrences_data_${idToUse}` : '@occurrences_data';
-      await AsyncStorage.setItem(key, JSON.stringify(newOccurrences));
-    } catch (e) {
-      console.error('Failed to save occurrences', e);
+      const dados =
+        aba === 'minhas'
+          ? await listarOcorrencias(undefined, periodo)
+          : coords
+            ? await listarOcorrenciasProximas(coords.latitude, coords.longitude, raio, undefined, periodo)
+            : [];
+
+      setOcorrencias(dados);
+    } catch (e: any) {
+      console.warn('[ocorrencias] falha ao carregar:', e);
+      showToast(e?.message ?? t('ocorrencias.erroCarregar'), 'danger');
+    } finally {
+      setCarregando(false);
+      setAtualizando(false);
     }
+    // Mesmo motivo do mapa: dependemos das coordenadas, não da identidade do
+    // objeto que o hook de localização recria a cada leitura do GPS.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aba, periodo, raio, coords?.latitude, coords?.longitude, showToast, t]);
+
+  useEffect(() => {
+    setCarregando(true);
+    carregar();
+  }, [carregar]);
+
+  // Os votos da usuária vêm numa consulta só, fora do ciclo da lista: eles não
+  // mudam quando ela troca de raio ou de período.
+  useEffect(() => {
+    meusVotos().then(setVotos).catch(() => setVotos({}));
+  }, []);
+
+  const listaFiltrada = useMemo(() => {
+    if (categoriaFiltro === 'todos') return ocorrencias;
+    const alvo = t(`mapa.${categoriaFiltro}` as 'mapa.catAssedio').toLowerCase();
+    return ocorrencias.filter(
+      (o) => o.title.toLowerCase().includes(alvo) || o.description.toLowerCase().includes(alvo)
+    );
+  }, [ocorrencias, categoriaFiltro, t]);
+
+  const formatarData = useCallback(
+    (iso: string | null) => {
+      if (!iso) return '';
+      const data = new Date(iso);
+      return `${data.toLocaleDateString(locale, { day: '2-digit', month: 'long' })}, ${data.toLocaleTimeString(
+        locale,
+        { hour: '2-digit', minute: '2-digit' }
+      )}`;
+    },
+    [locale]
+  );
+
+  const podeSalvar = titulo.trim().length > 0 && descricao.trim().length > 0;
+
+  const limparFormulario = () => {
+    setTitulo('');
+    setDescricao('');
+    setTipo('error');
+    setCategoriaSelecionada('');
+    setEditandoId(null);
   };
 
-  const canSave = title.trim().length > 0 && description.trim().length > 0;
-
-const filteredOccurrences = useMemo(() => {
-    let result = [...occurrences];
-
-    if (activeTab === 'proximas') {
-      result = result
-        .filter((item) => item.distance === radiusFilter)
-        .sort((a, b) => a.distance - b.distance);
-    }
-
-    if (activeTab === 'gerais' && categoryFilter !== 'Todos') {
-      const normalize = (str: string) => 
-        str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      
-      const termo = normalize(categoryFilter);
-      
-      result = result.filter((item) => {
-        return normalize(item.title).includes(termo) || normalize(item.desc).includes(termo);
-      });
-    }
-
-    return result;
-  }, [activeTab, occurrences, radiusFilter, categoryFilter]);
-
-    const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setType('error');
-    setDistance(500);
-    setSelectedCategory('');
-    setEditingId(null);
-  };
-
-  const closeModal = () => {
+  const fecharModal = () => {
     setModalVisible(false);
-    resetForm();
+    limparFormulario();
   };
 
-  const openCreateModal = () => {
-    resetForm();
+  const abrirCriacao = () => {
+    haptics.toque();
+    limparFormulario();
     setModalVisible(true);
   };
 
-  const openEditModal = (item: Occurrence) => {
-    const knownCategories = ['Assédio', 'Roubo', 'Suspeita'];
-    setEditingId(item.id);
-    setTitle(item.title);
-    setDescription(item.desc);
-    setType(item.type);
-    setDistance(item.distance);
-    setSelectedCategory(knownCategories.includes(item.title) ? item.title : 'Outro');
+  const abrirEdicao = (item: OcorrenciaApp) => {
+    haptics.toque();
+    const conhecidas = CATEGORIAS.slice(0, 3).map((c) => t(`mapa.${c}` as 'mapa.catAssedio'));
+    setEditandoId(item.id);
+    setTitulo(item.title);
+    setDescricao(item.description);
+    setTipo(item.type);
+    setCategoriaSelecionada(conhecidas.includes(item.title) ? item.title : t('mapa.catOutro'));
     setModalVisible(true);
   };
 
-  const formatOccurrenceTime = () => {
-    const now = new Date();
-    const date = now
-      .toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
-      .replace(' de ', ' ');
-    const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-    return `${date}, ${time}`;
-  };
-
-  const handleSubmitOccurrence = async () => {
-    if (!canSave || saving) return;
-    setSaving(true);
+  const salvar = async () => {
+    if (!podeSalvar || salvando) return;
+    haptics.acao();
+    setSalvando(true);
 
     try {
-      const token = await AsyncStorage.getItem('userToken');
-
-      if (editingId != null) {
-        // --- Editar ocorrência existente ---
-        const current = occurrences.find((o) => o.id === editingId);
-        if (!current) return;
-
-        if (current.synced && token) {
-          await api.put(
-            `/ocorrencias/${editingId}`,
-            { title: title.trim(), description: description.trim(), type },
-            token
-          );
-        }
-
-        const updated = occurrences.map((o) =>
-          o.id === editingId
-            ? { ...o, title: title.trim(), desc: description.trim(), type, distance }
-            : o
-        );
-        setOccurrences(updated);
-        saveOccurrences(updated);
-        closeModal();
+      if (editandoId != null) {
+        await atualizarOcorrencia(editandoId, {
+          title: titulo.trim(),
+          description: descricao.trim(),
+          type: tipo,
+        });
+        haptics.sucesso();
+        fecharModal();
         setEditSuccessVisible(true);
+        carregar();
       } else {
-        // --- Registrar nova ocorrência ---
-        let lat: number | null = null;
-        let lng: number | null = null;
-        try {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === 'granted') {
-            const lastKnown = await Location.getLastKnownPositionAsync({});
-            const loc = lastKnown ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            lat = loc.coords.latitude;
-            lng = loc.coords.longitude;
-          }
-        } catch {}
+        // A coordenada é o que coloca o relato no mapa e na busca por raio.
+        // Sem ela o registro ainda vale, só não aparece para quem está por perto.
+        let lat: number | null = coords?.latitude ?? null;
+        let lng: number | null = coords?.longitude ?? null;
 
-        let serverId: string | null = null;
-        if (token) {
+        if (lat == null || lng == null) {
           try {
-            const created = await api.post(
-              '/ocorrencias',
-              { title: title.trim(), description: description.trim(), type, latitude: lat, longitude: lng },
-              token
-            );
-            serverId = created?.id ?? null;
-          } catch (err) {
-            console.error('Erro ao salvar ocorrência na API:', err);
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+              const ultima = await Location.getLastKnownPositionAsync({});
+              const loc =
+                ultima ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+              lat = loc.coords.latitude;
+              lng = loc.coords.longitude;
+            }
+          } catch {
+            // segue sem coordenada
           }
         }
 
-        const newOccurrence: Occurrence = {
-          id: serverId ?? -Date.now(),
-          title: title.trim(),
-          desc: description.trim(),
-          time: formatOccurrenceTime(),
-          type,
-          distance,
-          synced: serverId != null,
-        };
+        await criarOcorrencia({
+          title: titulo.trim(),
+          description: descricao.trim(),
+          type: tipo,
+          latitude: lat,
+          longitude: lng,
+        });
 
-        const updatedOccurrences = [newOccurrence, ...occurrences];
-        setOccurrences(updatedOccurrences);
-        saveOccurrences(updatedOccurrences);
-        showToast('Ocorrência registrada com sucesso! ⚠️', 'success');
-
-        setCategoryFilter('Todos');
-        setActiveTab('gerais');
-        closeModal();
+        haptics.sucesso();
+        showToast(t('ocorrencias.registrada'), 'success');
+        setCategoriaFiltro('todos');
+        setAba('minhas');
+        fecharModal();
       }
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível salvar a ocorrência.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), e?.message ?? t('ocorrencias.erroSalvar'));
     } finally {
-      setSaving(false);
+      setSalvando(false);
     }
   };
 
-  const handleDeleteOccurrence = (item: Occurrence) => {
-    Alert.alert(
-      'Excluir ocorrência',
-      'Tem certeza que deseja excluir esta ocorrência? Essa ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (item.synced) {
-                const token = await AsyncStorage.getItem('userToken');
-                if (token) await api.delete(`/ocorrencias/${item.id}`, token);
-              }
-              const updated = occurrences.filter((o) => o.id !== item.id);
-              setOccurrences(updated);
-              saveOccurrences(updated);
-              showToast('Ocorrência excluída com sucesso!', 'success');
-            } catch (e: any) {
-              Alert.alert('Erro', e?.message ?? 'Não foi possível excluir a ocorrência.');
-            }
-          },
+  const excluir = (item: OcorrenciaApp) => {
+    haptics.aviso();
+    Alert.alert(t('ocorrencias.excluirTitulo'), t('ocorrencias.excluirPergunta'), [
+      { text: t('comum.cancelar'), style: 'cancel' },
+      {
+        text: t('comum.excluir'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await excluirOcorrencia(item.id);
+            setOcorrencias((anteriores) => anteriores.filter((o) => o.id !== item.id));
+            haptics.sucesso();
+            showToast(t('ocorrencias.excluida'), 'success');
+          } catch (e: any) {
+            haptics.erro();
+            Alert.alert(t('comum.erro'), e?.message ?? t('ocorrencias.erroExcluir'));
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const FilterChip = ({ label, value }: { label: string; value: number }) => (
+  const aoValidar = (
+    id: string,
+    placar: { confirmacoes: number; refutacoes: number; meuVoto: Voto | null }
+  ) => {
+    setOcorrencias((anteriores) =>
+      anteriores.map((o) =>
+        o.id === id ? { ...o, confirmacoes: placar.confirmacoes, refutacoes: placar.refutacoes } : o
+      )
+    );
+    setVotos((anteriores) => {
+      const proximo = { ...anteriores };
+      if (placar.meuVoto === null) delete proximo[id];
+      else proximo[id] = placar.meuVoto;
+      return proximo;
+    });
+  };
+
+  const Chip = ({
+    rotulo,
+    ativo,
+    onPress,
+  }: {
+    rotulo: string;
+    ativo: boolean;
+    onPress: () => void;
+  }) => (
     <TouchableOpacity
-      style={[styles.filterChip, radiusFilter === value && styles.activeFilterChip]}
-      onPress={() => setRadiusFilter(value)}
+      style={[styles.filterChip, ativo && styles.activeFilterChip]}
+      onPress={() => {
+        haptics.selecao();
+        onPress();
+      }}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: ativo }}
+      accessibilityLabel={t('a11y.filtro', { nome: rotulo })}
     >
-      <Text style={[styles.filterChipText, radiusFilter === value && styles.activeFilterChipText]}>
-        {label}
-      </Text>
+      <Text style={[styles.filterChipText, ativo && styles.activeFilterChipText]}>{rotulo}</Text>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={colors.background}
-      />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
       <View style={styles.header}>
         <BackHomeButton style={{ marginRight: 15 }} />
-
         <View>
-          <Text style={styles.headerTitle}>Ocorrencias</Text>
+          <Text style={styles.headerTitle} accessibilityRole="header">
+            {t('ocorrencias.titulo')}
+          </Text>
           <Text style={styles.headerSubtitle}>
-            {activeTab === 'proximas' ? 'Alertas perto de voce' : 'Historico da regiao'}
+            {aba === 'proximas' ? t('ocorrencias.subtituloProximas') : t('ocorrencias.subtituloMinhas')}
           </Text>
         </View>
       </View>
 
-      <View style={styles.tabContainer}>
+      <View style={styles.tabContainer} accessibilityRole="tablist">
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'proximas' && styles.activeTab]}
-          onPress={() => setActiveTab('proximas')}
+          style={[styles.tab, aba === 'proximas' && styles.activeTab]}
+          onPress={() => {
+            haptics.selecao();
+            setAba('proximas');
+          }}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: aba === 'proximas' }}
         >
-          <Text style={[styles.tabText, activeTab === 'proximas' && styles.activeTabText]}>
-            Proximas
+          <Text style={[styles.tabText, aba === 'proximas' && styles.activeTabText]}>
+            {t('ocorrencias.abaProximas')}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'gerais' && styles.activeTab]}
-          onPress={() => setActiveTab('gerais')}
+          style={[styles.tab, aba === 'minhas' && styles.activeTab]}
+          onPress={() => {
+            haptics.selecao();
+            setAba('minhas');
+          }}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: aba === 'minhas' }}
         >
-          <Text style={[styles.tabText, activeTab === 'gerais' && styles.activeTabText]}>
-            Gerais
+          <Text style={[styles.tabText, aba === 'minhas' && styles.activeTabText]}>
+            {t('ocorrencias.abaMinhas')}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {activeTab === 'proximas' && (
+      {aba === 'proximas' && (
         <View style={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Raio de busca</Text>
+          <Text style={styles.filterLabel}>{t('ocorrencias.raioBusca')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-            <FilterChip label="500m" value={500} />
-            <FilterChip label="1km" value={1000} />
-            <FilterChip label="2km" value={2000} />
-            <FilterChip label="5km" value={5000} />
-          </ScrollView>
-        </View>
-      )}
-
-      {activeTab === 'gerais' && (
-        <View style={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Categoria</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-            {['Todos', 'Assédio', 'Roubo', 'Suspeita'].map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.filterChip, categoryFilter === cat && styles.activeFilterChip]}
-                onPress={() => setCategoryFilter(cat)}
-              >
-                <Text style={[styles.filterChipText, categoryFilter === cat && styles.activeFilterChipText]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
+            {RAIOS.map((valor) => (
+              <Chip
+                key={valor}
+                rotulo={valor >= 1000 ? `${valor / 1000}km` : `${valor}m`}
+                ativo={raio === valor}
+                onPress={() => setRaio(valor)}
+              />
             ))}
           </ScrollView>
         </View>
       )}
 
+      <View style={styles.filterContainer}>
+        <Text style={styles.filterLabel}>{t('ocorrencias.periodo')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
+          {PERIODOS.map((p) => (
+            <Chip
+              key={p.valor}
+              rotulo={t(p.chave)}
+              ativo={periodo === p.valor}
+              onPress={() => setPeriodo(p.valor)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={styles.filterContainer}>
+        <Text style={styles.filterLabel}>{t('ocorrencias.categoria')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
+          <Chip
+            rotulo={t('comum.todos')}
+            ativo={categoriaFiltro === 'todos'}
+            onPress={() => setCategoriaFiltro('todos')}
+          />
+          {CATEGORIAS.slice(0, 3).map((c) => (
+            <Chip
+              key={c}
+              rotulo={t(`mapa.${c}` as 'mapa.catAssedio')}
+              ativo={categoriaFiltro === c}
+              onPress={() => setCategoriaFiltro(c)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
       <View style={styles.actionContainer}>
         <TouchableOpacity
           style={styles.registerButton}
           activeOpacity={0.8}
-          onPress={openCreateModal}
+          onPress={abrirCriacao}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.reportarOcorrencia')}
         >
           <MaterialIcons name="add-alert" size={24} color="#FFF" />
-          <Text style={styles.registerButtonText}>Nova ocorrencia</Text>
+          <Text style={styles.registerButtonText}>{t('ocorrencias.nova')}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
-        {filteredOccurrences.length > 0 ? (
-          filteredOccurrences.map((item) => (
-            <View key={item.id} style={styles.occurrenceCard}>
-              <View style={styles.occurrenceIconBox}>
-                <MaterialIcons
-                  name={item.type === 'error' ? 'error' : 'warning'}
-                  size={30}
-                  color={colors.primary}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={atualizando}
+            onRefresh={() => {
+              setAtualizando(true);
+              carregar();
+            }}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {carregando ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator color={colors.primary} size="large" />
+          </View>
+        ) : listaFiltrada.length > 0 ? (
+          listaFiltrada.map((item) => {
+            const souAutora = item.user_id === uid;
+            const distancia = formatarDistancia(item.distance);
+
+            return (
+              <View key={item.id} style={styles.occurrenceCard}>
+                <View style={{ flexDirection: 'row' }}>
+                  <View style={styles.occurrenceIconBox}>
+                    <MaterialIcons
+                      name={item.type === 'error' ? 'error' : 'warning'}
+                      size={30}
+                      color={colors.primary}
+                    />
+                  </View>
+
+                  <View style={styles.occurrenceInfo}>
+                    <Text style={styles.occurrenceTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+
+                    <Text style={styles.occurrenceDescription} numberOfLines={2}>
+                      {item.description}
+                    </Text>
+
+                    {distancia && (
+                      <View style={styles.distanceBadge}>
+                        <MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.primary} />
+                        <Text style={styles.distanceText} numberOfLines={1}>
+                          {t('ocorrencias.distancia', { valor: distancia })}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.occurrenceTimeRow}>
+                      <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
+                      <Text style={styles.occurrenceTime} numberOfLines={1}>
+                        {formatarData(item.created_at)}
+                        {!souAutora && item.user_name
+                          ? ` · ${t('ocorrencias.porFulana', { nome: item.user_name })}`
+                          : ''}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {souAutora && (
+                    <View style={styles.occurrenceActionsRow}>
+                      <TouchableOpacity
+                        style={styles.cardActionButton}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        onPress={() => abrirEdicao(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('comum.editar')}
+                      >
+                        <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.cardActionButton, styles.cardActionButtonDanger]}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        onPress={() => excluir(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('comum.excluir')}
+                      >
+                        <MaterialCommunityIcons name="trash-can-outline" size={18} color="#E53935" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                <ValidacaoRelato
+                  ocorrenciaId={item.id}
+                  confirmacoes={item.confirmacoes}
+                  refutacoes={item.refutacoes}
+                  meuVoto={votos[item.id] ?? null}
+                  souAutora={souAutora}
+                  onMudou={(placar) => aoValidar(item.id, placar)}
+                  onMensagem={showToast}
                 />
               </View>
-
-              <View style={styles.occurrenceInfo}>
-                <Text style={styles.occurrenceTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-
-                <Text style={styles.occurrenceDescription} numberOfLines={2}>
-                  {item.desc}
-                </Text>
-
-                <View style={styles.distanceBadge}>
-                  <MaterialCommunityIcons
-                    name="map-marker-distance"
-                    size={12}
-                    color={colors.primary}
-                  />
-                  <Text style={styles.distanceText} numberOfLines={1}>
-                    {item.distance >= 1000
-                      ? `${(item.distance / 1000).toFixed(1)}km`
-                      : `${item.distance}m`}{' '}
-                    de distancia
-                  </Text>
-                </View>
-
-                <View style={styles.occurrenceTimeRow}>
-                  <MaterialCommunityIcons name="clock-outline" size={12} color={colors.secondary} />
-                  <Text style={styles.occurrenceTime} numberOfLines={1}>
-                    {item.time}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.occurrenceActionsRow}>
-                <TouchableOpacity
-                  style={styles.cardActionButton}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  onPress={() => openEditModal(item)}
-                >
-                  <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.cardActionButton, styles.cardActionButtonDanger]}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  onPress={() => handleDeleteOccurrence(item)}
-                >
-                  <MaterialCommunityIcons name="trash-can-outline" size={18} color="#E53935" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
+            );
+          })
         ) : (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconContainer}>
-              <MaterialCommunityIcons
-                name="shield-check-outline"
-                size={50}
-                color={colors.primary}
-              />
+              <MaterialCommunityIcons name="shield-check-outline" size={50} color={colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>Nenhuma ocorrência encontrada</Text>
+            <Text style={styles.emptyTitle}>{t('ocorrencias.vazioTitulo')}</Text>
             <Text style={styles.emptyText}>
-              Nenhum alerta bate com o seu filtro atual.
+              {aba === 'minhas'
+                ? t('ocorrencias.vazioMinhasTexto')
+                : !coords
+                  ? t('ocorrencias.semGps')
+                  : t('ocorrencias.vazioTexto')}
             </Text>
           </View>
         )}
       </ScrollView>
 
-      <Modal animationType="slide" transparent visible={modalVisible} onRequestClose={closeModal}>
+      <Modal animationType="slide" transparent visible={modalVisible} onRequestClose={fecharModal}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>{editingId != null ? 'Editar ocorrência' : 'Registrar ocorrencia'}</Text>
-                <Text style={styles.modalSubtitle}>
-                  {editingId != null ? 'Atualize as informações abaixo' : 'Informe o que aconteceu'}
-                </Text>
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle} accessibilityRole="header">
+                    {editandoId != null ? t('ocorrencias.editar') : t('ocorrencias.registrar')}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    {editandoId != null
+                      ? t('ocorrencias.atualizeAbaixo')
+                      : t('ocorrencias.informeOqueAconteceu')}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={fecharModal}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.fecharModal')}
+                >
+                  <MaterialIcons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-                <MaterialIcons name="close" size={24} color={colors.text} />
+              <Text style={styles.inputLabel}>{t('mapa.gravidade')}</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                {(['error', 'warning'] as OcorrenciaTipo[]).map((valor) => {
+                  const ativo = tipo === valor;
+                  const rotulo =
+                    valor === 'error' ? t('ocorrencias.tipoEmergencia') : t('ocorrencias.tipoAtencao');
+                  const cor = valor === 'error' ? '#E53935' : '#FB8C00';
+                  return (
+                    <TouchableOpacity
+                      key={valor}
+                      style={[styles.filterChip, ativo && styles.activeFilterChip]}
+                      onPress={() => {
+                        haptics.selecao();
+                        setTipo(valor);
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: ativo }}
+                      accessibilityLabel={rotulo}
+                    >
+                      <MaterialIcons
+                        name={valor === 'error' ? 'error' : 'warning'}
+                        size={15}
+                        color={ativo ? '#FFF' : cor}
+                      />
+                      <Text style={[styles.filterChipText, ativo && styles.activeFilterChipText]}>
+                        {'  ' + rotulo}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.inputLabel}>{t('ocorrencias.categoria')}</Text>
+              <View style={{ marginBottom: 16 }}>
+                {CATEGORIAS.map((chave) => {
+                  const rotulo = t(`mapa.${chave}` as 'mapa.catAssedio');
+                  const marcada = categoriaSelecionada === rotulo;
+                  const ehOutro = chave === 'catOutro';
+
+                  return (
+                    <TouchableOpacity
+                      key={chave}
+                      style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, minHeight: 44 }}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        haptics.selecao();
+                        setCategoriaSelecionada(rotulo);
+                        // Nas três categorias fixas o título já é a própria
+                        // categoria; em "Outro" a pessoa escreve o dela.
+                        setTitulo(ehOutro ? '' : rotulo);
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: marcada, selected: marcada }}
+                      accessibilityLabel={rotulo}
+                    >
+                      <MaterialCommunityIcons
+                        name={marcada ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                        size={24}
+                        color={marcada ? colors.primary : colors.secondary}
+                      />
+                      <Text style={{ marginLeft: 10, fontSize: 16, color: colors.text }}>{rotulo}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {categoriaSelecionada === t('mapa.catOutro') && (
+                  <TextInput
+                    style={[styles.input, { marginTop: 4 }]}
+                    value={titulo}
+                    onChangeText={setTitulo}
+                    placeholder={t('ocorrencias.qualOcorrencia')}
+                    placeholderTextColor={colors.secondary}
+                    maxLength={40}
+                    accessibilityLabel={t('ocorrencias.qualOcorrencia')}
+                  />
+                )}
+              </View>
+
+              <Text style={styles.inputLabel}>{t('ocorrencias.descricao')}</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={descricao}
+                onChangeText={setDescricao}
+                placeholder={t('ocorrencias.descrevaOqueAconteceu')}
+                placeholderTextColor={colors.secondary}
+                multiline
+                textAlignVertical="top"
+                maxLength={160}
+                accessibilityLabel={t('ocorrencias.descricao')}
+              />
+
+              <TouchableOpacity
+                style={[styles.saveButton, (!podeSalvar || salvando) && styles.saveButtonDisabled]}
+                activeOpacity={0.85}
+                onPress={salvar}
+                disabled={!podeSalvar || salvando}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  editandoId != null ? t('ocorrencias.salvarAlteracoes') : t('ocorrencias.salvar')
+                }
+                accessibilityState={{ disabled: !podeSalvar || salvando, busy: salvando }}
+              >
+                {salvando ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <MaterialIcons name="check-circle" size={24} color="#FFF" />
+                    <Text style={styles.saveButtonText}>
+                      {editandoId != null ? t('ocorrencias.salvarAlteracoes') : t('ocorrencias.salvar')}
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
-
-            <Text style={styles.inputLabel}>Categoria da Ocorrência</Text>
-            <View style={{ marginBottom: 16 }}>
-              {['Assédio', 'Roubo', 'Suspeita', 'Outro'].map((cat) => {
-                const isChecked = selectedCategory === cat;
-
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      setSelectedCategory(cat);
-                      if (cat !== 'Outro') {
-                        setTitle(cat); // Se for as 3 principais, preenche o título sozinho
-                      } else {
-                        setTitle(''); // Se for 'Outro', limpa o título pra pessoa digitar
-                      }
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={isChecked ? "checkbox-marked" : "checkbox-blank-outline"}
-                      size={24}
-                      color={isChecked ? colors.primary : "#A39EAE"}
-                    />
-                    <Text style={{ marginLeft: 10, fontSize: 16, color: colors.text }}>
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {/* Mágica: Mostra o campo de digitar SÓ SE a caixinha "Outro" for marcada */}
-              {selectedCategory === 'Outro' && (
-                <TextInput
-                  style={[styles.input, { marginTop: 4 }]}
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Qual foi a ocorrência?"
-                  placeholderTextColor="#A39EAE"
-                  maxLength={40}
-                />
-              )}
-            </View>
-
-            <Text style={styles.inputLabel}>Distancia estimada</Text>
-            <View style={{ marginBottom: 16 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-                {[
-                  { label: '500m', value: 500 },
-                  { label: '1km', value: 1000 },
-                  { label: '2km', value: 2000 },
-                  { label: '5km', value: 5000 },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[styles.filterChip, distance === item.value && styles.activeFilterChip]}
-                    onPress={() => setDistance(item.value)}
-                  >
-                    <Text style={[styles.filterChipText, distance === item.value && styles.activeFilterChipText]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <Text style={styles.inputLabel}>Categoria da Ocorrência (Título)</Text>
-            <View style={{ marginBottom: 16 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-                {['Assédio', 'Roubo', 'Suspeita', 'Outro'].map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.filterChip, title === cat && styles.activeFilterChip]}
-                    onPress={() => setTitle(cat)}
-                  >
-                    <Text style={[styles.filterChipText, title === cat && styles.activeFilterChipText]}>
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            <Text style={styles.inputLabel}>Descricao</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Descreva a ocorrencia"
-              placeholderTextColor="#A39EAE"
-              multiline
-              textAlignVertical="top"
-              maxLength={160}
-            />
-
-            <TouchableOpacity
-              style={[styles.saveButton, (!canSave || saving) && styles.saveButtonDisabled]}
-              activeOpacity={0.85}
-              onPress={handleSubmitOccurrence}
-              disabled={!canSave || saving}
-            >
-              {saving ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <MaterialIcons name="check-circle" size={24} color="#FFF" />
-                  <Text style={styles.saveButtonText}>
-                    {editingId != null ? 'Salvar alterações' : 'Salvar ocorrencia'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -615,8 +691,8 @@ const filteredOccurrences = useMemo(() => {
       <SuccessPopup
         visible={editSuccessVisible}
         onContinue={() => setEditSuccessVisible(false)}
-        title="Ocorrência atualizada!"
-        message="As alterações foram salvas com sucesso."
+        title={t('ocorrencias.atualizada')}
+        message={t('ocorrencias.atualizadaTexto')}
       />
     </SafeAreaView>
   );

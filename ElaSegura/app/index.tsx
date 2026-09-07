@@ -16,6 +16,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, ThemeColors } from '../constants/theme';
+import { useI18n } from '../context/I18nContext';
+import { haptics } from '../lib/haptics';
+import type { ChaveTraducao } from '../i18n';
 
 const MULHER_IMAGE = require('../assets/images/logo.png');
 
@@ -25,27 +28,35 @@ const MULHER_IMAGE = require('../assets/images/logo.png');
 const LIGHT_COLORS = Colors.light;
 const LIGHT_GRADIENT = ['#FFFFFF', '#FFECF4'] as const;
 
-const SLIDES = [
+// Cada slide guarda as CHAVES dos textos, não os textos: assim a tela de
+// abertura acompanha a troca de idioma como o resto do app.
+const SLIDES: {
+  image: any;
+  icon: 'shield-check' | 'alarm-light' | 'map-marker-radius';
+  kicker: ChaveTraducao;
+  title: ChaveTraducao;
+  description: ChaveTraducao;
+}[] = [
   {
     image: MULHER_IMAGE,
-    icon: 'shield-check' as const,
-    kicker: 'Bem-vinda',
-    title: 'Sua segurança,\nnossa prioridade',
-    description: 'Alertas de emergência, mapa colaborativo e sua rede de confiança — tudo em um só lugar, sempre com você.',
+    icon: 'shield-check',
+    kicker: 'boasVindas.kicker1',
+    title: 'boasVindas.titulo1',
+    description: 'boasVindas.texto1',
   },
   {
     image: MULHER_IMAGE,
-    icon: 'alarm-light' as const,
-    kicker: 'Emergência',
-    title: 'SOS em\num toque',
-    description: 'Ative o alerta de emergência e avise sua rede de confiança na hora, com sua localização em tempo real.',
+    icon: 'alarm-light',
+    kicker: 'boasVindas.kicker2',
+    title: 'boasVindas.titulo2',
+    description: 'boasVindas.texto2',
   },
   {
     image: MULHER_IMAGE,
-    icon: 'map-marker-radius' as const,
-    kicker: 'Comunidade',
-    title: 'Mapa\ncolaborativo',
-    description: 'Veja áreas de risco reportadas pela comunidade e trace rotas mais seguras para chegar aonde precisa.',
+    icon: 'map-marker-radius',
+    kicker: 'boasVindas.kicker3',
+    title: 'boasVindas.titulo3',
+    description: 'boasVindas.texto3',
   },
 ];
 
@@ -72,6 +83,7 @@ const getMetrics = (width: number, height: number) => {
 
 export default function Welcome() {
   const router = useRouter();
+  const { t } = useI18n();
   const colors = LIGHT_COLORS;
   const { width, height } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -119,19 +131,27 @@ export default function Welcome() {
 
             <View style={styles.kickerPill}>
               <MaterialCommunityIcons name={slide.icon} size={15} color={colors.primary} />
-              <Text style={styles.kickerText}>{slide.kicker}</Text>
+              <Text style={styles.kickerText}>{t(slide.kicker)}</Text>
             </View>
 
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.description}>{slide.description}</Text>
+            <Text style={styles.title} accessibilityRole="header">
+              {t(slide.title)}
+            </Text>
+            <Text style={styles.description}>{t(slide.description)}</Text>
           </Animated.View>
 
           <View style={styles.dots}>
             {SLIDES.map((_, index) => (
               <TouchableOpacity
                 key={index}
-                onPress={() => goToSlide(index)}
+                onPress={() => {
+                  haptics.selecao();
+                  goToSlide(index);
+                }}
                 hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: index === activeIndex }}
+                accessibilityLabel={t('boasVindas.irParaSlide', { n: index + 1 })}
               >
                 <View style={[styles.dot, index === activeIndex && styles.dotActive]} />
               </TouchableOpacity>
@@ -141,7 +161,12 @@ export default function Welcome() {
           <TouchableOpacity
             style={styles.primaryButtonWrapper}
             activeOpacity={0.85}
-            onPress={() => router.push({ pathname: '/login', params: { tab: 'cadastro' } })}
+            onPress={() => {
+              haptics.toque();
+              router.push({ pathname: '/login', params: { tab: 'cadastro' } });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('boasVindas.comecar')}
           >
             <LinearGradient
               colors={[colors.primary, '#C2185B']}
@@ -149,16 +174,21 @@ export default function Welcome() {
               end={{ x: 1, y: 0 }}
               style={styles.primaryButton}
             >
-              <Text style={styles.primaryButtonText}>Começar →</Text>
+              <Text style={styles.primaryButtonText}>{t('boasVindas.comecar')}</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.secondaryLink}
             activeOpacity={0.7}
-            onPress={() => router.push({ pathname: '/login', params: { tab: 'login' } })}
+            onPress={() => {
+              haptics.toque();
+              router.push({ pathname: '/login', params: { tab: 'login' } });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('boasVindas.jaTenhoConta')}
           >
-            <Text style={styles.secondaryLinkText}>Já tenho uma conta</Text>
+            <Text style={styles.secondaryLinkText}>{t('boasVindas.jaTenhoConta')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

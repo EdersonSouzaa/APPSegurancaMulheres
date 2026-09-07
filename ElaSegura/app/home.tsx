@@ -22,10 +22,16 @@ import { getStyles } from '../styles/home.styles';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { Colors } from '../constants/theme';
+import { haptics } from '../lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocation } from '../hooks/use-location';
-import { api } from '../services/api';
+import { obterPerfil, atualizarPreferencias } from '../services/usuario';
+import { obterAlertas } from '../services/alertas';
+import { listarContatos } from '../services/contatos';
+import { atualizarOcorrencia, excluirOcorrencia } from '../services/ocorrencias';
+import { acionarSos } from '../services/sos';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import { FakeCallModal } from '../components/FakeCallModal';
@@ -36,17 +42,19 @@ import { LeafletMap } from '../components/LeafletMap';
 const TRUST_COLORS = ['#F5A623', '#7C4DFF', '#2196F3', '#4CAF50', '#FF7043'];
 const FORTALEZA_CENTER: [number, number] = [-3.766, -38.483];
 
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Bom dia,';
-  if (hour < 18) return 'Boa tarde,';
-  return 'Boa noite,';
+/** Chave da saudação conforme a hora do aparelho. */
+const chaveDaSaudacao = () => {
+  const hora = new Date().getHours();
+  if (hora < 12) return 'home.bomDia' as const;
+  if (hora < 18) return 'home.boaTarde' as const;
+  return 'home.boaNoite' as const;
 };
 
 const Home = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDarkMode, theme } = useTheme();
+  const { t, locale } = useI18n();
   const [modalVisible, setModalVisible] = useState(false);
   const [moreActionsVisible, setMoreActionsVisible] = useState(false);
   const [locationPopupVisible, setLocationPopupVisible] = useState(false);
@@ -109,13 +117,10 @@ const Home = () => {
 
   const loadLocationPreference = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        const userData = await api.get('/user/me', token);
-        if (userData) {
-          setLocationEnabled(userData.location_enabled || false);
-          await AsyncStorage.setItem('@notifications_enabled', String(userData.notifications_enabled));
-        }
+      const userData = await obterPerfil();
+      if (userData) {
+        setLocationEnabled(userData.location_enabled || false);
+        await AsyncStorage.setItem('@notifications_enabled', String(userData.notifications_enabled));
       }
     } catch (error) {
       console.error('Erro ao carregar preferência de localização:', error);
@@ -124,12 +129,8 @@ const Home = () => {
 
   const loadAlerts = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        const data = await api.get('/alertas', token);
-        const occurrencesOnly = (data.alerts || []).filter((item: any) => item.source === 'ocorrencia');
-        setOccurrences(occurrencesOnly);
-      }
+      const data = await obterAlertas();
+      setOccurrences((data.alerts || []).filter((item) => item.source === 'ocorrencia'));
     } catch (error) {
       console.error('Erro ao carregar alertas:', error);
     }
@@ -137,20 +138,16 @@ const Home = () => {
 
   const loadTrustedContacts = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        const data: any[] = (await api.get('/contatos', token)) || [];
+      const data = (await listarContatos()) || [];
 
-        // Mostra todos os contatos cadastrados, com os emergenciais na frente.
-        // Antes o filtro deixava só os emergenciais, então quem cadastrava um
-        // contato sem marcar o switch via o círculo vazio e achava que o
-        // cadastro tinha falhado.
-        const ordenados = [
-          ...data.filter((c) => c.emergencial),
-          ...data.filter((c) => !c.emergencial),
-        ];
-        setTrustedContacts(ordenados);
-      }
+      // Mostra todos os contatos cadastrados, com os emergenciais na frente.
+      // Antes o filtro deixava só os emergenciais, então quem cadastrava um
+      // contato sem marcar o switch via o círculo vazio e achava que o
+      // cadastro tinha falhado.
+      setTrustedContacts([
+        ...data.filter((c) => c.emergencial),
+        ...data.filter((c) => !c.emergencial),
+      ]);
     } catch (error) {
       console.error('Erro ao carregar círculo de confiança:', error);
     }
@@ -159,8 +156,8 @@ const Home = () => {
   const formatAlertTime = (iso: string) => {
     if (!iso) return '';
     const d = new Date(iso);
-    const day = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
-    const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const day = d.toLocaleDateString(locale, { day: '2-digit', month: 'long' });
+    const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     return `${day}, ${time}`;
   };
 
@@ -182,18 +179,14 @@ const Home = () => {
 
   const handleSaveEditOccurrence = async () => {
     if (!editingOccurrence || !canSaveEdit || editSaving) return;
+    haptics.acao();
     setEditSaving(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        Alert.alert('Atenção', 'Faça login para editar esta ocorrência.');
-        return;
-      }
-      await api.put(
-        `/ocorrencias/${editingOccurrence.id}`,
-        { title: editTitle.trim(), description: editDescription.trim(), type: editType },
-        token
-      );
+      await atualizarOcorrencia(editingOccurrence.id, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        type: editType,
+      });
       setOccurrences((prev) =>
         prev.map((o) =>
           o.id === editingOccurrence.id
@@ -201,41 +194,37 @@ const Home = () => {
             : o
         )
       );
+      haptics.sucesso();
       closeEditOccurrence();
       setEditSuccessVisible(true);
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar a ocorrência.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), e?.message ?? t('home.erroAtualizar'));
     } finally {
       setEditSaving(false);
     }
   };
 
   const handleDeleteOccurrence = (item: any) => {
-    Alert.alert(
-      'Excluir ocorrência',
-      'Tem certeza que deseja excluir esta ocorrência? Essa ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = await AsyncStorage.getItem('userToken');
-              if (!token) {
-                Alert.alert('Atenção', 'Faça login para excluir esta ocorrência.');
-                return;
-              }
-              await api.delete(`/ocorrencias/${item.id}`, token);
-              setOccurrences((prev) => prev.filter((o) => o.id !== item.id));
-              showToast('Ocorrência excluída com sucesso!', 'success');
-            } catch (e: any) {
-              Alert.alert('Erro', e?.message ?? 'Não foi possível excluir a ocorrência.');
-            }
-          },
+    haptics.aviso();
+    Alert.alert(t('home.excluirTitulo'), t('home.excluirPergunta'), [
+      { text: t('comum.cancelar'), style: 'cancel' },
+      {
+        text: t('comum.excluir'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await excluirOcorrencia(item.id);
+            setOccurrences((prev) => prev.filter((o) => o.id !== item.id));
+            haptics.sucesso();
+            showToast(t('home.ocorrenciaExcluida'), 'success');
+          } catch (e: any) {
+            haptics.erro();
+            Alert.alert(t('comum.erro'), e?.message ?? t('home.erroExcluir'));
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   useFocusEffect(
@@ -252,36 +241,35 @@ const Home = () => {
       setLocationPopupVisible(true);
       return;
     }
+    haptics.acao();
     const url = `https://maps.google.com/?q=${coords.latitude},${coords.longitude}`;
     try {
-      await Share.share({
-        message: `📍 Esta é minha localização em tempo real:\n${url}\n— Enviado pelo ElaSegura`,
-      });
+      await Share.share({ message: t('home.localizacaoMensagem', { url }) });
     } catch {
-      showToast('Não foi possível compartilhar a localização.', 'danger');
+      haptics.erro();
+      showToast(t('home.erroCompartilhar'), 'danger');
     }
   };
 
   const handleSilentAlert = async () => {
+    // Sem som e sem alerta na tela — mas com vibração, que é o único retorno
+    // possível quando olhar o aparelho não é uma opção.
+    haptics.emergencia();
     setSilentAlertLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) return;
-
       const locationString = coords
         ? `${coords.latitude.toFixed(6)},${coords.longitude.toFixed(6)}`
-        : 'Localização não disponível';
+        : null;
 
-      const response = await api.post('/sos', { location: locationString }, token);
+      const response = await acionarSos(locationString);
       const contatos = response.contatosEmergencia || [];
 
-      if (contatos.length === 0) {
-        showToast('Nenhum contato emergencial para notificar.', 'info');
-      } else {
-        showToast('Alerta discreto enviado ao seu círculo de confiança.', 'success');
-      }
+      showToast(
+        contatos.length === 0 ? t('home.semContatoEmergencial') : t('home.alertaDiscretoEnviado'),
+        contatos.length === 0 ? 'info' : 'success'
+      );
     } catch {
-      showToast('Não foi possível enviar o alerta silencioso.', 'danger');
+      showToast(t('home.erroAlertaSilencioso'), 'danger');
     } finally {
       setSilentAlertLoading(false);
     }
@@ -304,10 +292,10 @@ const Home = () => {
           <View style={styles.headerTop}>
             <View style={styles.headerContent}>
               <Text style={styles.headerGreeting} numberOfLines={1}>
-                {getGreeting()} <Text style={styles.headerName}>{userName || 'Usuária'}</Text>
+                {t(chaveDaSaudacao())} <Text style={styles.headerName}>{userName || t('home.usuaria')}</Text>
               </Text>
               <View style={styles.headerSubtitleRow}>
-                <Text style={styles.headerSubtitleText}>Você está segura aqui</Text>
+                <Text style={styles.headerSubtitleText}>{t('home.voceEstaSegura')}</Text>
                 <MaterialCommunityIcons name="heart" size={14} color={colors.primary} style={styles.headerSubtitleIcon} />
               </View>
             </View>
@@ -315,8 +303,13 @@ const Home = () => {
             <View style={styles.headerActions}>
               <TouchableOpacity
                 style={styles.headerBellButton}
-                onPress={() => router.push('/alertas' as any)}
+                onPress={() => {
+                  haptics.toque();
+                  router.push('/alertas' as any);
+                }}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.verAlertas')}
               >
                 <MaterialCommunityIcons name="bell-outline" size={22} color={colors.primary} />
                 {occurrences.length > 0 && (
@@ -328,8 +321,13 @@ const Home = () => {
 
               <TouchableOpacity
                 style={styles.headerAvatar}
-                onPress={() => router.push('/perfil')}
+                onPress={() => {
+                  haptics.toque();
+                  router.push('/perfil');
+                }}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.editarPerfil')}
               >
                 {profilePicture ? (
                   <Image source={{ uri: profilePicture }} style={{ width: 42, height: 42, borderRadius: 21 }} />
@@ -347,12 +345,15 @@ const Home = () => {
             style={styles.statusCard}
             activeOpacity={0.9}
             onPress={() => {
+              haptics.toque();
               if (locationEnabled) {
                 router.push('/mapa');
               } else {
                 setLocationPopupVisible(true);
               }
             }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.rotaSegura')}
           >
             <View style={styles.statusMapPreview}>
               <LeafletMap
@@ -370,9 +371,18 @@ const Home = () => {
 
           {/* Ações rápidas */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Ações rápidas</Text>
-            <TouchableOpacity onPress={() => setMoreActionsVisible(true)}>
-              <Text style={styles.sectionLink}>Ver todas</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              {t('home.acoesRapidas')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                haptics.toque();
+                setMoreActionsVisible(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.abrirMenu')}
+            >
+              <Text style={styles.sectionLink}>{t('home.verTodas')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -382,17 +392,22 @@ const Home = () => {
               color="#F35F74"
               tint={isDarkMode ? '#F35F7433' : '#FFF0F2'}
               icon="navigation-variant-outline"
-              label="Rota segura"
-              sublabel="Navegue com segurança"
-              onPress={() => router.push('/mapa')}
+              label={t('home.rotaSegura')}
+              sublabel={t('home.rotaSeguraSub')}
+              a11y={t('a11y.rotaSegura')}
+              onPress={() => {
+                haptics.toque();
+                router.push('/mapa');
+              }}
             />
             <QuickActionCard
               styles={styles}
               color="#2196F3"
               tint={isDarkMode ? '#2196F333' : '#E3F2FD'}
               icon="crosshairs-gps"
-              label="Compartilhar local"
-              sublabel="Ao vivo com contatos"
+              label={t('home.compartilharLocal')}
+              sublabel={t('home.compartilharLocalSub')}
+              a11y={t('a11y.compartilharLocal')}
               onPress={handleShareLocation}
             />
             <QuickActionCard
@@ -400,17 +415,22 @@ const Home = () => {
               color="#9C27B0"
               tint={isDarkMode ? '#9C27B033' : '#F3E5F5'}
               icon="phone-alert-outline"
-              label="Chamada falsa"
-              sublabel="Escape de situações"
-              onPress={() => setFakeCallVisible(true)}
+              label={t('home.chamadaFalsa')}
+              sublabel={t('home.chamadaFalsaSub')}
+              a11y={t('a11y.chamadaFalsa')}
+              onPress={() => {
+                haptics.toque();
+                setFakeCallVisible(true);
+              }}
             />
             <QuickActionCard
               styles={styles}
               color="#FF9800"
               tint={isDarkMode ? '#FF980033' : '#FFF3E0'}
               icon="bell-off-outline"
-              label="Alerta silencioso"
-              sublabel="SOS discreto"
+              label={t('home.alertaSilencioso')}
+              sublabel={t('home.alertaSilenciosoSub')}
+              a11y={t('a11y.alertaSilencioso')}
               onPress={handleSilentAlert}
               loading={silentAlertLoading}
             />
@@ -418,18 +438,33 @@ const Home = () => {
 
           {/* Círculo de confiança */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Círculo de confiança</Text>
-            <TouchableOpacity onPress={() => router.push('/contatos')}>
-              <Text style={styles.sectionLink}>Gerenciar</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              {t('home.circuloConfianca')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/contatos')}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.gerenciar')}
+            >
+              <Text style={styles.sectionLink}>{t('home.gerenciar')}</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trustCircleRow}>
-            <TouchableOpacity style={styles.trustCircleItem} activeOpacity={0.8} onPress={() => router.push('/contatos')}>
+            <TouchableOpacity
+              style={styles.trustCircleItem}
+              activeOpacity={0.8}
+              onPress={() => {
+                haptics.toque();
+                router.push('/contatos');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.adicionarContato')}
+            >
               <View style={styles.trustCircleAddButton}>
                 <MaterialCommunityIcons name="plus" size={24} color={colors.primary} />
               </View>
-              <Text style={styles.trustCircleName}>Adicionar</Text>
+              <Text style={styles.trustCircleName}>{t('home.adicionar')}</Text>
             </TouchableOpacity>
 
             {trustedContacts.map((contact, index) => (
@@ -438,6 +473,8 @@ const Home = () => {
                 style={styles.trustCircleItem}
                 activeOpacity={0.8}
                 onPress={() => router.push('/contatos')}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.editarContato', { nome: contact.name })}
               >
                 <View style={[styles.trustCircleAvatar, { backgroundColor: TRUST_COLORS[index % TRUST_COLORS.length] }]}>
                   <Text style={styles.trustCircleAvatarText}>{contact.name.charAt(0).toUpperCase()}</Text>
@@ -449,19 +486,33 @@ const Home = () => {
 
           {/* Ocorrências Recentes */}
           <View style={styles.recentSectionHeader}>
-            <Text style={styles.sectionTitle}>Ocorrências Recentes</Text>
-            <TouchableOpacity onPress={() => setModalVisible(true)}>
-              <Text style={styles.sectionLink}>Ver todas ❯</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              {t('home.ocorrenciasRecentes')}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                haptics.toque();
+                setModalVisible(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.verOcorrencias')}
+            >
+              <Text style={styles.sectionLink}>{t('home.verTodas')} ❯</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
             style={styles.recentRegisterButton}
             activeOpacity={0.85}
-            onPress={() => router.push('/ocorrencias')}
+            onPress={() => {
+              haptics.toque();
+              router.push('/ocorrencias');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.reportarOcorrencia')}
           >
             <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#FFF" />
-            <Text style={styles.recentRegisterButtonText}>Registrar ocorrência</Text>
+            <Text style={styles.recentRegisterButtonText}>{t('home.registrarOcorrencia')}</Text>
           </TouchableOpacity>
 
           <View style={{ gap: 15 }}>
@@ -470,10 +521,8 @@ const Home = () => {
                 <View style={styles.emptyOccurrenceIconBox}>
                   <MaterialCommunityIcons name="shield-check-outline" size={36} color="#34C759" />
                 </View>
-                <Text style={styles.emptyOccurrenceTitle}>Nenhuma ocorrência recente</Text>
-                <Text style={styles.emptyOccurrenceSubtitle}>
-                  Tudo tranquilo por aqui! Se algo acontecer, registre para manter seu círculo de confiança informado.
-                </Text>
+                <Text style={styles.emptyOccurrenceTitle}>{t('home.semOcorrenciasTitulo')}</Text>
+                <Text style={styles.emptyOccurrenceSubtitle}>{t('home.semOcorrenciasTexto')}</Text>
               </View>
             ) : (
               occurrences.slice(0, 2).map((item) => (
@@ -496,8 +545,8 @@ const Home = () => {
 
       {/* Barra de Navegação Inferior */}
       <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 15) }]}>
-        <NavItem active icon={<MaterialIcons name="home" size={26} color={colors.primary} />} label="Início" styles={styles} />
-        <NavItem icon={<MaterialCommunityIcons name="map-outline" size={26} color={colors.secondary} />} label="Mapa" onPress={() => router.push('/mapa')} styles={styles} />
+        <NavItem active icon={<MaterialIcons name="home" size={26} color={colors.primary} />} label={t('nav.inicio')} styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="map-outline" size={26} color={colors.secondary} />} label={t('nav.mapa')} onPress={() => router.push('/mapa')} styles={styles} />
         <View style={styles.sosNavItem}>
           <View style={styles.sosPulseWrapper}>
             <Animated.View
@@ -511,7 +560,17 @@ const Home = () => {
                 },
               ]}
             />
-            <TouchableOpacity style={styles.sosNavButtonTouchable} activeOpacity={0.85} onPress={() => router.push('/sos' as any)}>
+            <TouchableOpacity
+              style={styles.sosNavButtonTouchable}
+              activeOpacity={0.85}
+              onPress={() => {
+                haptics.emergencia();
+                router.push('/sos' as any);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.acionarSos')}
+              accessibilityHint={t('a11y.acionarSosDica')}
+            >
               <LinearGradient
                 colors={[colors.primary, '#C2185B']}
                 start={{ x: 0, y: 0 }}
@@ -523,8 +582,8 @@ const Home = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={26} color={colors.secondary} />} label="Contatos" onPress={() => router.push('/contatos')} styles={styles} />
-        <NavItem icon={<MaterialCommunityIcons name="account-circle-outline" size={26} color={colors.secondary} />} label="Perfil" onPress={() => router.push('/perfil')} styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="account-plus-outline" size={26} color={colors.secondary} />} label={t('nav.contatos')} onPress={() => router.push('/contatos')} styles={styles} />
+        <NavItem icon={<MaterialCommunityIcons name="account-circle-outline" size={26} color={colors.secondary} />} label={t('nav.perfil')} onPress={() => router.push('/perfil')} styles={styles} />
       </View>
 
       <FakeCallModal visible={fakeCallVisible} onClose={() => setFakeCallVisible(false)} />
@@ -541,38 +600,31 @@ const Home = () => {
             <View style={styles.locationPopupIconBox}>
               <MaterialCommunityIcons name="map-marker-radius" size={48} color={colors.primary} />
             </View>
-            <Text style={styles.locationPopupTitle}>Ativar Localização?</Text>
-            <Text style={styles.locationPopupDescription}>
-              Para acessar o mapa e compartilhar sua localização em tempo real com seus contatos SOS, ative a permissão de localização.
+            <Text style={styles.locationPopupTitle} accessibilityRole="header">
+              {t('home.ativarLocalizacaoTitulo')}
             </Text>
+            <Text style={styles.locationPopupDescription}>{t('home.ativarLocalizacaoTexto')}</Text>
             <TouchableOpacity
               style={[styles.locationPopupButton, { backgroundColor: colors.primary }]}
               onPress={async () => {
+                haptics.acao();
                 setLocationLoading(true);
                 try {
                   const { status } = await Location.requestForegroundPermissionsAsync();
 
                   if (status !== 'granted') {
                     setLocationLoading(false);
-                    Alert.alert(
-                      'Permissão Necessária',
-                      'Você negou o acesso à localização. Para usar o mapa, ative a permissão de localização nas configurações do seu celular.',
-                      [{ text: 'OK' }]
-                    );
+                    haptics.aviso();
+                    Alert.alert(t('home.permissaoNegadaTitulo'), t('home.permissaoNegadaTexto'), [{ text: 'OK' }]);
                     return;
                   }
 
-                  const token = await AsyncStorage.getItem('userToken');
-                  if (token) {
-                    await api.put('/user/preferences', {
-                      notifications_enabled: true,
-                      location_enabled: true
-                    }, token);
-                    setLocationEnabled(true);
-                  }
+                  await atualizarPreferencias({ notifications_enabled: true, location_enabled: true });
+                  setLocationEnabled(true);
 
                   setLocationLoading(false);
                   setLocationPopupVisible(false);
+                  haptics.sucesso();
 
                   if (Constants.appOwnership !== 'expo') {
                     const Notifications = require('expo-notifications');
@@ -582,8 +634,8 @@ const Home = () => {
                     }
                     await Notifications.scheduleNotificationAsync({
                       content: {
-                        title: 'Localização Ativada',
-                        body: 'Sua localização está habilitada e o mapa será aberto.',
+                        title: t('home.notifLocalizacaoTitulo'),
+                        body: t('home.notifLocalizacaoTexto'),
                         sound: true,
                       },
                       trigger: null,
@@ -592,24 +644,30 @@ const Home = () => {
                   router.push('/mapa');
                 } catch (error) {
                   setLocationLoading(false);
-                  Alert.alert('Erro', 'Não foi possível ativar a localização. Tente novamente.');
+                  haptics.erro();
+                  Alert.alert(t('comum.erro'), t('home.erroAtivarLocalizacao'));
                 }
               }}
               activeOpacity={0.8}
               disabled={locationLoading}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.ativarLocalizacaoBotao')}
+              accessibilityState={{ disabled: locationLoading, busy: locationLoading }}
             >
               {locationLoading ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <Text style={styles.locationPopupButtonText}>Ativar Localização</Text>
+                <Text style={styles.locationPopupButtonText}>{t('home.ativarLocalizacaoBotao')}</Text>
               )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.locationPopupCancelButton}
               onPress={() => setLocationPopupVisible(false)}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.agoraNao')}
             >
-              <Text style={styles.locationPopupCancelText}>Agora não</Text>
+              <Text style={styles.locationPopupCancelText}>{t('home.agoraNao')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -625,10 +683,14 @@ const Home = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.sectionTitle}>Últimas Ocorrências</Text>
+              <Text style={styles.sectionTitle} accessibilityRole="header">
+                {t('home.ultimasOcorrencias')}
+              </Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
               >
                 <MaterialIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
@@ -636,7 +698,7 @@ const Home = () => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {occurrences.length === 0 ? (
-                <Text style={{ textAlign: 'center', marginTop: 20, color: colors.secondary }}>Nenhuma ocorrência encontrada.</Text>
+                <Text style={{ textAlign: 'center', marginTop: 20, color: colors.secondary }}>{t('home.nenhumaEncontrada')}</Text>
               ) : (
                 occurrences.map((item) => (
                   <OccurrenceCard
@@ -671,8 +733,15 @@ const Home = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.sectionTitle}>Todas as ações</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setMoreActionsVisible(false)}>
+              <Text style={styles.sectionTitle} accessibilityRole="header">
+                {t('home.todasAcoes')}
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setMoreActionsVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
+              >
                 <MaterialIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -681,35 +750,35 @@ const Home = () => {
               styles={styles}
               colors={colors}
               icon="file-alert-outline"
-              label="Ocorrências"
+              label={t('home.acaoOcorrencias')}
               onPress={() => { setMoreActionsVisible(false); router.push('/ocorrencias'); }}
             />
             <MoreActionRow
               styles={styles}
               colors={colors}
               icon="account-heart-outline"
-              label="Contatos SOS"
+              label={t('home.acaoContatos')}
               onPress={() => { setMoreActionsVisible(false); router.push('/contatos'); }}
             />
             <MoreActionRow
               styles={styles}
               colors={colors}
               icon="bell-outline"
-              label="Alertas Recentes"
+              label={t('home.acaoAlertas')}
               onPress={() => { setMoreActionsVisible(false); router.push('/alertas' as any); }}
             />
             <MoreActionRow
               styles={styles}
               colors={colors}
               icon="map-marker-alert-outline"
-              label="Áreas de risco"
+              label={t('home.acaoAreasRisco')}
               onPress={() => { setMoreActionsVisible(false); router.push('/mapa' as any); }}
             />
             <MoreActionRow
               styles={styles}
               colors={colors}
               icon="cog-outline"
-              label="Ajustes"
+              label={t('home.acaoAjustes')}
               onPress={() => { setMoreActionsVisible(false); router.push('/settings'); }}
             />
           </View>
@@ -727,10 +796,17 @@ const Home = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.sectionTitle}>Editar ocorrência</Text>
-                <Text style={{ fontSize: 13, color: colors.secondary, marginTop: 2 }}>Atualize as informações abaixo</Text>
+                <Text style={styles.sectionTitle} accessibilityRole="header">
+                  {t('home.editarOcorrencia')}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.secondary, marginTop: 2 }}>{t('home.atualizeAbaixo')}</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={closeEditOccurrence}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeEditOccurrence}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
+              >
                 <MaterialIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -738,17 +814,29 @@ const Home = () => {
             <View style={styles.editTypeRow}>
               <TouchableOpacity
                 style={[styles.editTypeChip, editType === 'error' && styles.editTypeChipActiveError]}
-                onPress={() => setEditType('error')}
+                onPress={() => {
+                  haptics.selecao();
+                  setEditType('error');
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: editType === 'error' }}
+                accessibilityLabel={t('mapa.emergencia')}
               >
                 <MaterialCommunityIcons name="alert-decagram" size={16} color={editType === 'error' ? '#FFF' : '#E53935'} />
-                <Text style={[styles.editTypeChipText, editType === 'error' && styles.editTypeChipTextActive]}>Emergência</Text>
+                <Text style={[styles.editTypeChipText, editType === 'error' && styles.editTypeChipTextActive]}>{t('mapa.emergencia')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.editTypeChip, editType === 'warning' && styles.editTypeChipActiveWarning]}
-                onPress={() => setEditType('warning')}
+                onPress={() => {
+                  haptics.selecao();
+                  setEditType('warning');
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: editType === 'warning' }}
+                accessibilityLabel={t('mapa.atencaoTipo')}
               >
                 <MaterialCommunityIcons name="alert" size={16} color={editType === 'warning' ? '#FFF' : '#FB8C00'} />
-                <Text style={[styles.editTypeChipText, editType === 'warning' && styles.editTypeChipTextActive]}>Atenção</Text>
+                <Text style={[styles.editTypeChipText, editType === 'warning' && styles.editTypeChipTextActive]}>{t('mapa.atencaoTipo')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -756,19 +844,21 @@ const Home = () => {
               style={styles.editInput}
               value={editTitle}
               onChangeText={setEditTitle}
-              placeholder="Título da ocorrência"
+              placeholder={t('home.tituloOcorrencia')}
               placeholderTextColor={colors.secondary}
               maxLength={40}
+              accessibilityLabel={t('home.tituloOcorrencia')}
             />
             <TextInput
               style={[styles.editInput, styles.editTextArea]}
               value={editDescription}
               onChangeText={setEditDescription}
-              placeholder="Descreva o que aconteceu"
+              placeholder={t('home.descrevaOqueAconteceu')}
               placeholderTextColor={colors.secondary}
               multiline
               textAlignVertical="top"
               maxLength={160}
+              accessibilityLabel={t('home.descrevaOqueAconteceu')}
             />
 
             <TouchableOpacity
@@ -776,13 +866,16 @@ const Home = () => {
               activeOpacity={0.85}
               onPress={handleSaveEditOccurrence}
               disabled={!canSaveEdit || editSaving}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.salvarAlteracoes')}
+              accessibilityState={{ disabled: !canSaveEdit || editSaving, busy: editSaving }}
             >
               {editSaving ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
                   <MaterialIcons name="check-circle" size={22} color="#FFF" />
-                  <Text style={styles.editSaveButtonText}>Salvar alterações</Text>
+                  <Text style={styles.editSaveButtonText}>{t('home.salvarAlteracoes')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -793,8 +886,9 @@ const Home = () => {
       <SuccessPopup
         visible={editSuccessVisible}
         onContinue={() => setEditSuccessVisible(false)}
-        title="Ocorrência atualizada!"
-        message="As alterações foram salvas com sucesso."
+        title={t('home.ocorrenciaAtualizada')}
+        message={t('home.ocorrenciaAtualizadaTexto')}
+        continueLabel={t('comum.continuar')}
       />
     </SafeAreaView>
   );
@@ -802,8 +896,17 @@ const Home = () => {
 
 // --- COMPONENTES AUXILIARES ---
 
-const QuickActionCard = ({ icon, label, sublabel, onPress, styles, color, tint, loading }: any) => (
-  <TouchableOpacity style={styles.quickAccessCard} activeOpacity={0.7} onPress={onPress} disabled={loading}>
+const QuickActionCard = ({ icon, label, sublabel, a11y, onPress, styles, color, tint, loading }: any) => (
+  <TouchableOpacity
+    style={styles.quickAccessCard}
+    activeOpacity={0.7}
+    onPress={onPress}
+    disabled={loading}
+    accessibilityRole="button"
+    accessibilityLabel={a11y ?? label}
+    accessibilityHint={sublabel}
+    accessibilityState={{ disabled: !!loading, busy: !!loading }}
+  >
     <View style={[styles.quickAccessIconBox, { backgroundColor: tint }]}>
       {loading ? (
         <ActivityIndicator size="small" color={color} />
@@ -817,7 +920,13 @@ const QuickActionCard = ({ icon, label, sublabel, onPress, styles, color, tint, 
 );
 
 const MoreActionRow = ({ icon, label, onPress, styles, colors }: any) => (
-  <TouchableOpacity style={styles.moreActionsRow} activeOpacity={0.7} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.moreActionsRow}
+    activeOpacity={0.7}
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+  >
     <View style={styles.moreActionsIconBox}>
       <MaterialCommunityIcons name={icon} size={22} color={colors.primary} />
     </View>
@@ -871,7 +980,14 @@ const OccurrenceCard = ({ title, description, time, source, styles, colors, onEd
 );
 
 const NavItem = ({ active, icon, label, onPress, styles }: any) => (
-  <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.navItem}
+    activeOpacity={0.7}
+    onPress={onPress}
+    accessibilityRole="tab"
+    accessibilityState={{ selected: !!active }}
+    accessibilityLabel={label}
+  >
     <View style={active ? styles.navIconActive : undefined}>
       {icon}
     </View>

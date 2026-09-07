@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur'; // Para um efeito mais premium se disponível
+import { useI18n } from '../context/I18nContext';
 
 interface SuccessPopupProps {
   visible: boolean;
@@ -18,12 +19,19 @@ interface SuccessPopupProps {
 export const SuccessPopup = ({
   visible,
   onContinue,
-  title = "Sucesso!",
-  message = "Ação realizada com sucesso!",
+  title,
+  message,
   icon = "check",
   accentColor = "#F35F74",
-  continueLabel = "Continuar",
+  continueLabel,
 }: SuccessPopupProps) => {
+  // Os padrões vêm do dicionário, e não de literais nos parâmetros: assim
+  // um popup aberto sem título não volta a falar português num app em inglês.
+  const { t } = useI18n();
+  const tituloExibido = title ?? t('popup.sucessoTitulo');
+  const mensagemExibida = message ?? t('popup.sucessoTexto');
+  const rotuloBotao = continueLabel ?? t('comum.continuar');
+
   return (
     <Modal
       transparent={true}
@@ -39,15 +47,19 @@ export const SuccessPopup = ({
             </View>
           </View>
 
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            {tituloExibido}
+          </Text>
+          <Text style={styles.message}>{mensagemExibida}</Text>
 
           <TouchableOpacity
             style={styles.button}
             onPress={onContinue}
+            accessibilityRole="button"
+            accessibilityLabel={rotuloBotao}
             activeOpacity={0.8}
           >
-            <Text style={styles.buttonText}>{continueLabel}</Text>
+            <Text style={styles.buttonText}>{rotuloBotao}</Text>
           </TouchableOpacity>
         </View>
       </BlurView>

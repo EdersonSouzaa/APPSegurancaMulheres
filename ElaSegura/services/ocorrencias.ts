@@ -14,8 +14,9 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from 'geofire-common';
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import { toISO, exigirUsuaria, combinaFiltro, tolerarIndiceEmConstrucao } from './firestoreHelpers';
+import { comCache } from './cacheOffline';
 
 export type OcorrenciaTipo = 'error' | 'warning';
 
@@ -31,9 +32,37 @@ export type OcorrenciaApp = {
   latitude: number | null;
   longitude: number | null;
   created_at: string | null;
+  /** Validação comunitária — contadores desnormalizados no próprio documento. */
+  confirmacoes: number;
+  refutacoes: number;
   /** Só presente nas buscas por proximidade, em metros. */
   distance?: number;
 };
+
+/**
+ * Janela de tempo do feed. 'tudo' desliga o corte.
+ *
+ * O filtro roda em memória, e não como where('createdAt', '>=', ...), porque
+ * a consulta por raio já ordena por geohash — o Firestore não aceita um
+ * intervalo em outro campo junto disso, e criar um índice para cada combinação
+ * de raio e período seria pior que filtrar algumas dezenas de documentos aqui.
+ */
+export type PeriodoFiltro = '7d' | '30d' | '90d' | 'tudo';
+
+const DIAS_DO_PERIODO: Record<Exclude<PeriodoFiltro, 'tudo'>, number> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+};
+
+function dentroDoPeriodo(iso: string | null, periodo?: PeriodoFiltro): boolean {
+  if (!periodo || periodo === 'tudo') return true;
+  // Sem data conhecida o relato fica visível: esconder algo que pode ser
+  // recente é pior que mostrar algo que pode ser antigo.
+  if (!iso) return true;
+  const limite = Date.now() - DIAS_DO_PERIODO[periodo] * 24 * 60 * 60 * 1000;
+  return new Date(iso).getTime() >= limite;
+}
 
 const colOcorrencias = () => collection(db, 'ocorrencias');
 
@@ -55,6 +84,8 @@ function mapear(id: string, d: any): OcorrenciaApp {
     latitude: typeof d.latitude === 'number' ? d.latitude : null,
     longitude: typeof d.longitude === 'number' ? d.longitude : null,
     created_at: toISO(d.createdAt),
+    confirmacoes: typeof d.confirmacoes === 'number' ? d.confirmacoes : 0,
+    refutacoes: typeof d.refutacoes === 'number' ? d.refutacoes : 0,
   };
 }
 
@@ -67,21 +98,28 @@ function mapear(id: string, d: any): OcorrenciaApp {
  * Precisa do índice composto (userId ASC, createdAt DESC) — o Firestore
  * devolve um link direto para criá-lo na primeira execução.
  */
-export async function listarOcorrencias(filtro?: string): Promise<OcorrenciaApp[]> {
+export async function listarOcorrencias(
+  filtro?: string,
+  periodo?: PeriodoFiltro
+): Promise<OcorrenciaApp[]> {
   const user = exigirUsuaria();
 
-  return tolerarIndiceEmConstrucao<OcorrenciaApp[]>(
-    async () => {
-      const snap = await getDocs(
-        query(colOcorrencias(), where('userId', '==', user.uid), orderBy('createdAt', 'desc'))
-      );
-      return snap.docs
-        .map((d) => mapear(d.id, d.data()))
-        .filter((o) => combinaFiltro(filtro, o.title, o.description));
-    },
-    [],
-    'minhas ocorrências'
+  const { dados: minhas } = await comCache<OcorrenciaApp[]>(user.uid, 'minhasOcorrencias', () =>
+    tolerarIndiceEmConstrucao<OcorrenciaApp[]>(
+      async () => {
+        const snap = await getDocs(
+          query(colOcorrencias(), where('userId', '==', user.uid), orderBy('createdAt', 'desc'))
+        );
+        return snap.docs.map((d) => mapear(d.id, d.data()));
+      },
+      [],
+      'minhas ocorrências'
+    )
   );
+
+  return minhas
+    .filter((o) => combinaFiltro(filtro, o.title, o.description))
+    .filter((o) => dentroDoPeriodo(o.created_at, periodo));
 }
 
 /**
@@ -96,7 +134,8 @@ export async function listarOcorrenciasProximas(
   lat: number,
   lng: number,
   raioMetros = 1000,
-  filtro?: string
+  filtro?: string,
+  periodo?: PeriodoFiltro
 ): Promise<OcorrenciaApp[]> {
   exigirUsuaria();
 
@@ -107,35 +146,47 @@ export async function listarOcorrenciasProximas(
     throw new Error('O raio deve ser um número positivo em metros.');
   }
 
-  const faixas = geohashQueryBounds([lat, lng], raioMetros);
+  // O cache guarda o resultado bruto do raio, antes de busca textual e
+  // período: assim, offline, trocar o filtro ainda funciona sobre a última
+  // vizinhança conhecida em vez de esvaziar a tela.
+  const uid = auth.currentUser?.uid ?? null;
+  const chaveCache = `ocorrenciasProximas:${lat.toFixed(2)}:${lng.toFixed(2)}:${raioMetros}`;
 
-  const resultados = await Promise.all(
-    faixas.map((f) =>
-      getDocs(query(colOcorrencias(), orderBy('geohash'), startAt(f[0]), endAt(f[1])))
-    )
-  );
+  const { dados: bruto } = await comCache<OcorrenciaApp[]>(uid, chaveCache, async () => {
+    const faixas = geohashQueryBounds([lat, lng], raioMetros);
 
-  const vistos = new Set<string>();
-  const lista: OcorrenciaApp[] = [];
+    const resultados = await Promise.all(
+      faixas.map((f) =>
+        getDocs(query(colOcorrencias(), orderBy('geohash'), startAt(f[0]), endAt(f[1])))
+      )
+    );
 
-  for (const snap of resultados) {
-    for (const d of snap.docs) {
-      // Faixas de geohash podem se sobrepor, gerando documentos repetidos.
-      if (vistos.has(d.id)) continue;
-      vistos.add(d.id);
+    const vistos = new Set<string>();
+    const lista: OcorrenciaApp[] = [];
 
-      const o = mapear(d.id, d.data());
-      if (o.latitude == null || o.longitude == null) continue;
+    for (const snap of resultados) {
+      for (const d of snap.docs) {
+        // Faixas de geohash podem se sobrepor, gerando documentos repetidos.
+        if (vistos.has(d.id)) continue;
+        vistos.add(d.id);
 
-      const distancia = distanceBetween([o.latitude, o.longitude], [lat, lng]) * 1000;
-      if (distancia > raioMetros) continue;
-      if (!combinaFiltro(filtro, o.title, o.description)) continue;
+        const o = mapear(d.id, d.data());
+        if (o.latitude == null || o.longitude == null) continue;
 
-      lista.push({ ...o, distance: distancia });
+        const distancia = distanceBetween([o.latitude, o.longitude], [lat, lng]) * 1000;
+        if (distancia > raioMetros) continue;
+
+        lista.push({ ...o, distance: distancia });
+      }
     }
-  }
 
-  return lista.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+    return lista;
+  });
+
+  return bruto
+    .filter((o) => combinaFiltro(filtro, o.title, o.description))
+    .filter((o) => dentroDoPeriodo(o.created_at, periodo))
+    .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
 }
 
 export async function criarOcorrencia(dados: {
@@ -173,6 +224,11 @@ export async function criarOcorrencia(dados: {
     type: dados.type ?? 'error',
     latitude: dados.latitude ?? null,
     longitude: dados.longitude ?? null,
+    // Contadores da validação comunitária já nascem no documento: assim as
+    // Security Rules podem exigir variação de ±1 sem ter de tratar o caso do
+    // campo ainda não existir.
+    confirmacoes: 0,
+    refutacoes: 0,
     createdAt: serverTimestamp(),
   };
 

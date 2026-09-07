@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useI18n } from '../context/I18nContext';
+import { haptics } from '../lib/haptics';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
+  /** Quando não informado, usa o nome traduzido padrão. */
   callerName?: string;
 };
 
@@ -14,7 +17,9 @@ const formatDuration = (seconds: number) => {
   return `${m}:${s}`;
 };
 
-export const FakeCallModal = ({ visible, onClose, callerName = 'Mamãe' }: Props) => {
+export const FakeCallModal = ({ visible, onClose, callerName }: Props) => {
+  const { t } = useI18n();
+  const nomeExibido = callerName ?? t('chamadaFalsa.nomePadrao');
   const [status, setStatus] = useState<'ringing' | 'active'>('ringing');
   const [duration, setDuration] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -41,9 +46,13 @@ export const FakeCallModal = ({ visible, onClose, callerName = 'Mamãe' }: Props
     };
   }, [status]);
 
-  const handleAccept = () => setStatus('active');
+  const handleAccept = () => {
+    haptics.toque();
+    setStatus('active');
+  };
 
   const handleEnd = () => {
+    haptics.toque();
     onClose();
   };
 
@@ -52,10 +61,10 @@ export const FakeCallModal = ({ visible, onClose, callerName = 'Mamãe' }: Props
       <View style={styles.container}>
         <View style={styles.top}>
           <Text style={styles.callStatus}>
-            {status === 'ringing' ? 'Chamada recebida' : formatDuration(duration)}
+            {status === 'ringing' ? t('chamadaFalsa.recebendo') : formatDuration(duration)}
           </Text>
-          <Text style={styles.callerName}>{callerName}</Text>
-          <Text style={styles.callerSub}>celular</Text>
+          <Text style={styles.callerName}>{nomeExibido}</Text>
+          <Text style={styles.callerSub}>{t('chamadaFalsa.celular')}</Text>
         </View>
 
         <View style={styles.avatarCircle}>
@@ -65,25 +74,43 @@ export const FakeCallModal = ({ visible, onClose, callerName = 'Mamãe' }: Props
         {status === 'ringing' ? (
           <View style={styles.actionsRow}>
             <View style={styles.actionColumn}>
-              <TouchableOpacity style={[styles.actionButton, styles.declineButton]} activeOpacity={0.85} onPress={handleEnd}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.declineButton]}
+                activeOpacity={0.85}
+                onPress={handleEnd}
+                accessibilityRole="button"
+                accessibilityLabel={t('chamadaFalsa.recusar')}
+              >
                 <MaterialIcons name="call-end" size={30} color="#FFFFFF" />
               </TouchableOpacity>
-              <Text style={styles.actionLabel}>Recusar</Text>
+              <Text style={styles.actionLabel}>{t('chamadaFalsa.recusar')}</Text>
             </View>
             <View style={styles.actionColumn}>
-              <TouchableOpacity style={[styles.actionButton, styles.acceptButton]} activeOpacity={0.85} onPress={handleAccept}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.acceptButton]}
+                activeOpacity={0.85}
+                onPress={handleAccept}
+                accessibilityRole="button"
+                accessibilityLabel={t('chamadaFalsa.atender')}
+              >
                 <MaterialIcons name="call" size={30} color="#FFFFFF" />
               </TouchableOpacity>
-              <Text style={styles.actionLabel}>Atender</Text>
+              <Text style={styles.actionLabel}>{t('chamadaFalsa.atender')}</Text>
             </View>
           </View>
         ) : (
           <View style={styles.actionsRow}>
             <View style={styles.actionColumn}>
-              <TouchableOpacity style={[styles.actionButton, styles.declineButton]} activeOpacity={0.85} onPress={handleEnd}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.declineButton]}
+                activeOpacity={0.85}
+                onPress={handleEnd}
+                accessibilityRole="button"
+                accessibilityLabel={t('chamadaFalsa.encerrar')}
+              >
                 <MaterialIcons name="call-end" size={30} color="#FFFFFF" />
               </TouchableOpacity>
-              <Text style={styles.actionLabel}>Encerrar</Text>
+              <Text style={styles.actionLabel}>{t('chamadaFalsa.encerrar')}</Text>
             </View>
           </View>
         )}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -11,27 +11,41 @@ import {
   ScrollView,
   Switch,
   KeyboardAvoidingView,
+  Linking,
   Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../context/ThemeContext';
+import { useI18n } from '../context/I18nContext';
 import { Colors } from '../constants/theme';
 import { getStyles } from '../styles/mapa.styles';
 import { useLocation } from '../hooks/use-location';
 import { useMarkedZones } from '../hooks/use-marked-zones';
+import { haptics } from '../lib/haptics';
 import {
   LeafletMap,
   type RiskZone,
   type IncidentMarker,
   type ZoneLevel,
   type LatLngBounds,
+  type HeatPoint,
+  type SafePlaceMarker,
 } from '../components/LeafletMap';
 import { ToastNotification } from '../components/ToastNotification';
 import { BackHomeButton } from '../components/BackHomeButton';
-import { api } from '../services/api';
+import {
+  listarOcorrencias,
+  listarOcorrenciasProximas,
+  criarOcorrencia,
+  type OcorrenciaApp,
+  type PeriodoFiltro,
+} from '../services/ocorrencias';
+import { acionarSos } from '../services/sos';
+import { listarPontosSeguros } from '../services/pontosSeguros';
+import { estaContestado } from '../services/validacoes';
+import type { PontoSeguro } from '../constants/pontosSeguros';
 
 const FORTALEZA_BOUNDS: LatLngBounds = [
   [-3.9, -38.65],
@@ -39,87 +53,89 @@ const FORTALEZA_BOUNDS: LatLngBounds = [
 ];
 const FORTALEZA_CENTER: [number, number] = [-3.766, -38.483];
 
-/** Raio (em metros) das áreas marcadas pelo usuário (feat #71). */
-const MARK_RADIUS = 250;
-
-const SAMPLE_RISK_ZONES: RiskZone[] = [
-  { id: 1, lat: -3.771, lng: -38.479, radius: 800, level: 'safe', label: 'Área segura' },
-  { id: 2, lat: -3.754, lng: -38.490, radius: 1000, level: 'safe', label: 'Área segura' },
-  { id: 3, lat: -3.760, lng: -38.470, radius: 600, level: 'alert', label: 'Atenção' },
-  { id: 4, lat: -3.768, lng: -38.500, radius: 900, level: 'danger', label: 'Área de perigo' },
+/**
+ * Zonas de demonstração desenhadas no mapa. Sem `label`: o rótulo sai do
+ * nível (Segura / Alerta / Perigo) já traduzido, montado no componente.
+ */
+const SAMPLE_RISK_ZONES: Omit<RiskZone, 'label'>[] = [
+  { id: 1, lat: -3.771, lng: -38.479, radius: 800, level: 'safe' },
+  { id: 2, lat: -3.754, lng: -38.490, radius: 1000, level: 'safe' },
+  { id: 3, lat: -3.760, lng: -38.470, radius: 600, level: 'alert' },
+  { id: 4, lat: -3.768, lng: -38.500, radius: 900, level: 'danger' },
 ];
 
-const ZONES: { level: ZoneLevel; label: string; color: string }[] = [
-  { level: 'safe', label: 'Seguras', color: '#34C759' },
-  { level: 'alert', label: 'Alerta', color: '#FFCC00' },
-  { level: 'danger', label: 'Perigo', color: '#FF3B30' },
-];
-
-const CHIPS: { key: ChipKey; label: string }[] = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'risco', label: 'Risco alto' },
-  { key: 'meus', label: 'Meus' },
-];
-
-const RADIUS_OPTIONS = [
-  { label: '500m', value: 500 },
-  { label: '1km', value: 1000 },
-  { label: '2km', value: 2000 },
-  { label: '5km', value: 5000 },
-];
-
-const REPORT_CATEGORIES = ['Assédio', 'Roubo', 'Suspeita', 'Outro'];
+const RADIUS_OPTIONS = [500, 1000, 2000, 5000];
 
 type ChipKey = 'todos' | 'risco' | 'meus';
 
-type OccurrenceRow = {
-  id: number | string;
-  title: string;
-  description?: string;
-  location?: string | null;
-  type: 'error' | 'warning';
-  latitude: number;
-  longitude: number;
-  created_at?: string;
-};
+const CHIPS: { key: ChipKey; chave: 'mapa.chipTodos' | 'mapa.chipRisco' | 'mapa.chipMeus' }[] = [
+  { key: 'todos', chave: 'mapa.chipTodos' },
+  { key: 'risco', chave: 'mapa.chipRisco' },
+  { key: 'meus', chave: 'mapa.chipMeus' },
+];
 
-function timeAgo(iso?: string): string {
-  if (!iso) return 'agora';
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diffMs / 60000);
-  if (min < 1) return 'agora mesmo';
-  if (min < 60) return `há ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h}h`;
-  const d = Math.floor(h / 24);
-  return `há ${d}d`;
+const PERIODOS: { valor: PeriodoFiltro; chave: 'mapa.periodo7' | 'mapa.periodo30' | 'mapa.periodo90' | 'mapa.periodoTudo' }[] = [
+  { valor: '7d', chave: 'mapa.periodo7' },
+  { valor: '30d', chave: 'mapa.periodo30' },
+  { valor: '90d', chave: 'mapa.periodo90' },
+  { valor: 'tudo', chave: 'mapa.periodoTudo' },
+];
+
+const CATEGORIAS_RELATO = ['catAssedio', 'catRoubo', 'catSuspeita', 'catOutro'] as const;
+
+/**
+ * Peso de cada relato no mapa de calor.
+ *
+ * Duas coisas somam: gravidade e recência. Um assalto de ontem deve pesar mais
+ * que um aviso de dois meses atrás — sem esse decaimento, uma região que teve
+ * problemas há muito tempo continuaria vermelha para sempre, e o mapa perderia
+ * a capacidade de dizer onde o risco está agora.
+ *
+ * Relato contestado pela comunidade entra com peso bem baixo em vez de
+ * desaparecer: ainda é um sinal, só não é um sinal confiável.
+ */
+function pesoNoCalor(o: OcorrenciaApp): number {
+  const base = o.type === 'error' ? 1 : 0.55;
+
+  const dias = o.created_at
+    ? (Date.now() - new Date(o.created_at).getTime()) / (24 * 60 * 60 * 1000)
+    : 45;
+  const recencia = dias <= 7 ? 1 : dias <= 30 ? 0.7 : dias <= 90 ? 0.45 : 0.25;
+
+  const credibilidade = estaContestado(o) ? 0.2 : 1 + Math.min(0.5, o.confirmacoes * 0.12);
+
+  return Math.min(1, base * recencia * credibilidade);
 }
 
 export default function MapaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDarkMode, theme } = useTheme();
+  const { t, tp } = useI18n();
   const colors = Colors[theme];
   const styles = useMemo(() => getStyles(isDarkMode, colors), [isDarkMode, colors]);
 
   const { coords, errorMsg, loading } = useLocation();
-  const [occurrences, setOccurrences] = useState<OccurrenceRow[]>([]);
+  const [occurrences, setOccurrences] = useState<OcorrenciaApp[]>([]);
   const [sharing, setSharing] = useState(false);
   const mapRef = useRef<{ recenter: () => void }>(null);
 
-  // Busca, filtros e configurações (feat: redesign do mapa)
   const [searchText, setSearchText] = useState('');
   const [activeChip, setActiveChip] = useState<ChipKey>('todos');
   const [radius, setRadius] = useState(5000);
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>('30d');
   const [showIncidents, setShowIncidents] = useState(true);
+  const [showHeat, setShowHeat] = useState(true);
+  const [showSafePlaces, setShowSafePlaces] = useState(true);
+  const [showZonasComunidade, setShowZonasComunidade] = useState(true);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // feat #71 — marcação de áreas: cor "armada" na legenda + áreas marcadas (persistidas no device)
   const [markColor, setMarkColor] = useState<ZoneLevel | null>(null);
-  const { markedZones, setMarkedZones } = useMarkedZones();
+  const { markedZones, adicionarZona, removerZona, ehMinha } = useMarkedZones(coords, radius);
 
-  // Reportar ocorrência rápida direto do mapa
+  const [pontosSeguros, setPontosSeguros] = useState<PontoSeguro[]>([]);
+
   const [reportVisible, setReportVisible] = useState(false);
   const [reportType, setReportType] = useState<'error' | 'warning'>('error');
   const [reportCategory, setReportCategory] = useState('');
@@ -131,105 +147,215 @@ export default function MapaScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'danger' | 'info'>('success');
 
-  const showToast = (message: string, type: 'success' | 'danger' | 'info') => {
+  const showToast = useCallback((message: string, type: 'success' | 'danger' | 'info') => {
     setToastMessage(message);
     setToastType(type);
     setToastVisible(true);
-  };
+  }, []);
+
+  const ZONAS_LEGENDA: { level: ZoneLevel; rotulo: string; cor: string }[] = useMemo(
+    () => [
+      { level: 'safe', rotulo: t('mapa.zonasSeguras'), cor: '#34C759' },
+      { level: 'alert', rotulo: t('mapa.zonasAlerta'), cor: '#FFCC00' },
+      { level: 'danger', rotulo: t('mapa.zonasPerigo'), cor: '#FF3B30' },
+    ],
+    [t]
+  );
 
   const selectMarkColor = (level: ZoneLevel) => {
+    haptics.selecao();
     setMarkColor((prev) => (prev === level ? null : level));
   };
 
-  // Toque no mapa em modo de marcação: adiciona uma área da cor armada
-  const handleMapPress = (lat: number, lng: number) => {
+  const handleMapPress = async (lat: number, lng: number) => {
     if (!markColor) return;
-    setMarkedZones((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        lat,
-        lng,
-        level: markColor,
-        radius: MARK_RADIUS,
-      },
-    ]);
+    haptics.acao();
+    try {
+      await adicionarZona(lat, lng, markColor);
+      showToast(t('mapa.zonaCriada'), 'success');
+    } catch {
+      haptics.erro();
+      showToast(t('mapa.zonaErro'), 'danger');
+    }
   };
 
-  // Toque numa área marcada (fora do modo de marcação): oferece remover
   const handleMarkPress = (id: string) => {
     if (markColor) return; // marcando: não remove
-    Alert.alert('Remover marcação', 'Deseja remover esta área marcada?', [
-      { text: 'Cancelar', style: 'cancel' },
+    if (!ehMinha(id)) {
+      showToast(t('mapa.removerMarcacaoOutra'), 'info');
+      return;
+    }
+    haptics.toque();
+    Alert.alert(t('mapa.removerMarcacao'), t('mapa.removerMarcacaoPergunta'), [
+      { text: t('comum.cancelar'), style: 'cancel' },
       {
-        text: 'Remover',
+        text: t('comum.remover'),
         style: 'destructive',
-        onPress: () => setMarkedZones((prev) => prev.filter((z) => z.id !== id)),
+        onPress: async () => {
+          try {
+            await removerZona(id);
+            haptics.sucesso();
+            showToast(t('mapa.zonaRemovida'), 'success');
+          } catch {
+            haptics.erro();
+            showToast(t('mapa.zonaErro'), 'danger');
+          }
+        },
       },
     ]);
   };
 
-  // Busca ocorrências reais da API: "Todos"/"Risco alto" usam /ocorrencias/proximas (raio + busca
-  // textual), "Meus" usa /ocorrencias (só os relatos do usuário logado). Ambos os endpoints já
-  // suportam o parâmetro `filter`, então a busca por texto é resolvida no servidor.
+  // Pontos de apoio mudam raramente: uma carga por sessão basta.
+  useEffect(() => {
+    let cancelado = false;
+    listarPontosSeguros()
+      .then((lista) => {
+        if (!cancelado) setPontosSeguros(lista);
+      })
+      .catch((e) => console.warn('[mapa] pontos de apoio indisponíveis:', e));
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  /**
+   * Carrega os relatos conforme o filtro ativo.
+   *
+   * "Meus" lê só o que a usuária registrou; os outros usam a busca por raio
+   * via geohash. O período é aplicado nos dois casos pelo próprio serviço.
+   */
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
       if (activeChip !== 'meus' && !coords) return;
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        if (!token) {
-          if (!cancelled) setOccurrences([]);
-          return;
-        }
+        const busca = searchText.trim() || undefined;
 
-        let data: any;
-        if (activeChip === 'meus') {
-          const qs = searchText.trim() ? `?filter=${encodeURIComponent(searchText.trim())}` : '';
-          data = await api.get(`/ocorrencias${qs}`, token);
-        } else {
-          const params = new URLSearchParams({
-            lat: String(coords!.latitude),
-            lng: String(coords!.longitude),
-            radius: String(radius),
-          });
-          if (searchText.trim()) params.set('filter', searchText.trim());
-          data = await api.get(`/ocorrencias/proximas?${params.toString()}`, token);
-        }
+        const dados =
+          activeChip === 'meus'
+            ? await listarOcorrencias(busca, periodo)
+            : await listarOcorrenciasProximas(
+                coords!.latitude,
+                coords!.longitude,
+                radius,
+                busca,
+                periodo
+              );
 
-        if (cancelled || !Array.isArray(data)) return;
+        if (cancelled) return;
 
-        let rows: OccurrenceRow[] = data
-          .filter((o: any) => o.latitude != null && o.longitude != null)
-          .map((o: any) => ({
-            id: o.id,
-            title: o.title,
-            description: o.description,
-            location: o.location,
-            type: o.type === 'warning' ? 'warning' : 'error',
-            latitude: Number(o.latitude),
-            longitude: Number(o.longitude),
-            created_at: o.created_at,
-          }));
-
-        if (activeChip === 'risco') {
-          rows = rows.filter((r) => r.type === 'error');
-        }
-
-        setOccurrences(rows);
-      } catch {
+        const comCoordenada = dados.filter((o) => o.latitude != null && o.longitude != null);
+        setOccurrences(activeChip === 'risco' ? comCoordenada.filter((o) => o.type === 'error') : comCoordenada);
+      } catch (e) {
         // silent — sem conexão ainda mostra mapa
+        console.warn('[mapa] não foi possível carregar ocorrências:', e);
       }
     }, 350);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [coords?.latitude, coords?.longitude, activeChip, radius, searchText, refreshTick]);
+    // As dependências usam coords?.latitude/longitude de propósito: o objeto
+    // coords muda de identidade a cada leitura do GPS, e depender dele
+    // refaria a consulta a cada poucos segundos sem que nada tenha mudado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords?.latitude, coords?.longitude, activeChip, radius, searchText, periodo, refreshTick]);
 
   const incidentMarkers: IncidentMarker[] = useMemo(
-    () => occurrences.map((o) => ({ id: o.id, lat: o.latitude, lng: o.longitude, type: o.type, title: o.title })),
+    () =>
+      occurrences.map((o) => ({
+        id: o.id,
+        lat: o.latitude as number,
+        lng: o.longitude as number,
+        type: o.type,
+        title: o.title,
+        disputed: estaContestado(o),
+        confirmations: o.confirmacoes,
+      })),
     [occurrences]
+  );
+
+  const heatPoints: HeatPoint[] = useMemo(
+    () =>
+      occurrences.map((o) => ({
+        lat: o.latitude as number,
+        lng: o.longitude as number,
+        weight: pesoNoCalor(o),
+      })),
+    [occurrences]
+  );
+
+  const safePlaceMarkers: SafePlaceMarker[] = useMemo(
+    () =>
+      pontosSeguros.map((p) => ({
+        id: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.nome,
+        category: p.categoria,
+        phone: p.telefone,
+        address: p.endereco,
+        open24h: p.aberto24h,
+        verified: p.verificado,
+      })),
+    [pontosSeguros]
+  );
+
+  const rotulosMapa = useMemo(
+    () => ({
+      youAreHere: t('mapa.voceEstaAqui'),
+      markedArea: t('mapa.areaMarcada'),
+      // O {nome} é substituído dentro do LeafletMap, quando cada zona é
+      // montada — por isso a chave vai crua, sem interpolar aqui.
+      markedBy: t('mapa.marcadaPor'),
+      disputed: t('validacao.contestado'),
+      reports: t('validacao.confirmadoPor'),
+      unverified: t('pontosSeguros.naoVerificado'),
+      call: t('pontosSeguros.ligar'),
+      route: t('pontosSeguros.comoChegar'),
+      open24h: t('pontosSeguros.aberto24h'),
+      categories: {
+        delegacia: t('pontosSeguros.delegacia'),
+        policia: t('pontosSeguros.policia'),
+        saude: t('pontosSeguros.saude'),
+        acolhimento: t('pontosSeguros.acolhimento'),
+      },
+    }),
+    [t]
+  );
+
+  const handleSafePlaceAction = useCallback(
+    async (id: string, acao: 'ligar' | 'rota') => {
+      const ponto = pontosSeguros.find((p) => p.id === id);
+      if (!ponto) return;
+      haptics.acao();
+
+      const url =
+        acao === 'ligar' && ponto.telefone
+          ? `tel:${ponto.telefone}`
+          : `https://maps.google.com/?q=${ponto.lat},${ponto.lng}`;
+
+      try {
+        await Linking.openURL(url);
+      } catch {
+        haptics.erro();
+        showToast(t('comum.erro'), 'danger');
+      }
+    },
+    [pontosSeguros, showToast, t]
+  );
+
+  const timeAgo = useCallback(
+    (iso?: string | null): string => {
+      if (!iso) return t('comum.agoraMesmo');
+      const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+      if (min < 1) return t('comum.agoraMesmo');
+      if (min < 60) return t('comum.haMinutos', { min });
+      const h = Math.floor(min / 60);
+      if (h < 24) return t('comum.haHoras', { h });
+      return t('comum.haDias', { d: Math.floor(h / 24) });
+    },
+    [t]
   );
 
   const latestOccurrence = useMemo(() => {
@@ -239,32 +365,32 @@ export default function MapaScreen() {
     )[0];
   }, [occurrences]);
 
-  const riskZones = activeChip === 'meus' ? [] : SAMPLE_RISK_ZONES;
+  const riskZones: RiskZone[] = useMemo(() => {
+    if (activeChip === 'meus') return [];
+    const rotulos = Object.fromEntries(ZONAS_LEGENDA.map((z) => [z.level, z.rotulo]));
+    return SAMPLE_RISK_ZONES.map((z) => ({ ...z, label: rotulos[z.level] }));
+  }, [activeChip, ZONAS_LEGENDA]);
   const activeZoneFilter: ZoneLevel | null = activeChip === 'risco' ? 'danger' : null;
 
   const shareLocation = async () => {
     if (!coords) {
-      Alert.alert('Localização', 'Aguardando GPS...');
+      Alert.alert(t('nav.mapa'), t('mapa.aguardandoGps'));
       return;
     }
+    haptics.acao();
     setSharing(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        Alert.alert('Atenção', 'Faça login para compartilhar sua localização.');
-        return;
-      }
       const locationStr = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
-      const res = await api.post('/sos', { location: locationStr }, token);
+      const res = await acionarSos(locationStr);
       const num = res?.contatosEmergencia?.length ?? 0;
+      haptics.sucesso();
       Alert.alert(
-        'Localização compartilhada',
-        num > 0
-          ? `Sua localização foi enviada para ${num} contato(s) de emergência.`
-          : 'SOS registrado, mas você não tem contatos emergenciais cadastrados.'
+        t('mapa.localizacaoCompartilhada'),
+        num > 0 ? t('mapa.enviadaParaContatos', { n: num }) : t('mapa.semContatosEmergencia')
       );
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível compartilhar a localização.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), e?.message ?? t('mapa.erroCompartilhar'));
     } finally {
       setSharing(false);
     }
@@ -282,44 +408,43 @@ export default function MapaScreen() {
     resetReportForm();
   };
 
-  const reportTitle = reportCategory === 'Outro' ? reportTitleCustom.trim() : reportCategory;
+  const reportTitle =
+    reportCategory === t('mapa.catOutro') ? reportTitleCustom.trim() : reportCategory;
   const canSubmitReport = reportTitle.length > 0 && reportDescription.trim().length > 0;
 
   const submitReport = async () => {
     if (!canSubmitReport) return;
     if (!coords) {
-      Alert.alert('Localização', 'Aguardando GPS para anexar sua posição ao relato.');
+      Alert.alert(t('nav.mapa'), t('mapa.aguardandoGpsRelato'));
       return;
     }
+    haptics.acao();
     setReportSaving(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        Alert.alert('Atenção', 'Faça login para registrar uma ocorrência.');
-        return;
-      }
-      await api.post(
-        '/ocorrencias',
-        {
-          title: reportTitle,
-          description: reportDescription.trim(),
-          type: reportType,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-        },
-        token
-      );
-      showToast('Ocorrência registrada com sucesso!', 'success');
+      await criarOcorrencia({
+        title: reportTitle,
+        description: reportDescription.trim(),
+        type: reportType,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+      haptics.sucesso();
+      showToast(t('mapa.ocorrenciaRegistrada'), 'success');
       closeReportModal();
-      setRefreshTick((t) => t + 1);
+      setRefreshTick((tick) => tick + 1);
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível registrar a ocorrência.');
+      haptics.erro();
+      Alert.alert(t('comum.erro'), e?.message ?? t('mapa.erroRegistrar'));
     } finally {
       setReportSaving(false);
     }
   };
 
-  const subtitle = errorMsg ? 'Fortaleza · sem GPS' : loading ? 'Fortaleza · localizando...' : 'Fortaleza · tempo real';
+  const subtitle = errorMsg
+    ? t('mapa.subtituloSemGps')
+    : loading
+      ? t('mapa.subtituloLocalizando')
+      : t('mapa.subtituloTempoReal');
 
   const fabBaseBottom = 24 + insets.bottom;
 
@@ -331,11 +456,21 @@ export default function MapaScreen() {
         <View style={styles.headerLeft}>
           <BackHomeButton />
           <View style={{ flexShrink: 1 }}>
-            <Text style={styles.headerTitle}>Mapa de segurança</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {t('mapa.titulo')}
+            </Text>
             <Text style={styles.headerSubtitle}>{subtitle}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.filterButton} onPress={() => setSettingsVisible(true)}>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => {
+            haptics.toque();
+            setSettingsVisible(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.filtrosMapa')}
+        >
           <MaterialCommunityIcons name="tune-variant" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -344,30 +479,42 @@ export default function MapaScreen() {
         <MaterialCommunityIcons name="magnify" size={20} color={colors.secondary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar local ou bairro"
+          placeholder={t('mapa.buscar')}
           placeholderTextColor={colors.secondary}
           value={searchText}
           onChangeText={setSearchText}
           returnKeyType="search"
+          accessibilityLabel={t('a11y.buscarLocal')}
         />
         {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchText('')}>
+          <TouchableOpacity
+            onPress={() => setSearchText('')}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.limparBusca')}
+          >
             <MaterialCommunityIcons name="close-circle" size={18} color={colors.secondary} />
           </TouchableOpacity>
         )}
       </View>
 
-      <View style={styles.chipsRow}>
+      <View style={styles.chipsRow} accessibilityRole="tablist">
         {CHIPS.map((c) => {
           const active = activeChip === c.key;
+          const rotulo = t(c.chave);
           return (
             <TouchableOpacity
               key={c.key}
               style={[styles.chip, active && styles.chipActive]}
-              onPress={() => setActiveChip(c.key)}
+              onPress={() => {
+                haptics.selecao();
+                setActiveChip(c.key);
+              }}
               activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t('a11y.filtro', { nome: rotulo })}
             >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.label}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{rotulo}</Text>
             </TouchableOpacity>
           );
         })}
@@ -381,19 +528,26 @@ export default function MapaScreen() {
           incidents={incidentMarkers}
           showIncidents={showIncidents}
           activeZoneFilter={activeZoneFilter}
-          markedZones={markedZones}
+          markedZones={showZonasComunidade ? markedZones : []}
           drawColor={markColor}
+          heatPoints={heatPoints}
+          showHeat={showHeat}
+          safePlaces={safePlaceMarkers}
+          showSafePlaces={showSafePlaces}
           onMapPress={handleMapPress}
           onMarkPress={handleMarkPress}
+          onSafePlacePress={handleSafePlaceAction}
           maxBounds={FORTALEZA_BOUNDS}
           initialCenter={FORTALEZA_CENTER}
           initialZoom={14}
           isDarkMode={isDarkMode}
+          labels={rotulosMapa}
+          accessibilityLabel={tp('mapa.relatos', 'mapa.relatosPlural', occurrences.length)}
         />
 
-        {/* Status overlay (loading / error) — some quando não há dica de marcação ativa */}
         {(loading || errorMsg) && !markColor && (
           <View
+            accessibilityLiveRegion="polite"
             style={[
               styles.statusBanner,
               { backgroundColor: errorMsg ? 'rgba(255,59,48,0.92)' : 'rgba(0,122,255,0.92)' },
@@ -404,26 +558,24 @@ export default function MapaScreen() {
             ) : (
               <MaterialCommunityIcons name="alert-circle" size={18} color="#FFF" />
             )}
-            <Text style={styles.statusText}>{errorMsg ?? 'Obtendo localização...'}</Text>
+            <Text style={styles.statusText}>{errorMsg ?? t('mapa.obtendoLocalizacao')}</Text>
           </View>
         )}
 
-        {/* Dica do modo de marcação (feat #71) */}
         {markColor && (
-          <View style={styles.markHint}>
+          <View style={styles.markHint} accessibilityLiveRegion="polite">
             <MaterialCommunityIcons name="map-marker-plus" size={18} color="#FFF" />
-            <Text style={styles.statusText}>
-              Toque no mapa para marcar uma área. Toque na cor de novo para sair.
-            </Text>
+            <Text style={styles.statusText}>{t('mapa.dicaMarcacao')}</Text>
           </View>
         )}
 
-        {/* Card com a ocorrência mais recente por perto */}
         {latestOccurrence ? (
           <TouchableOpacity
             style={[styles.incidentCard, { bottom: fabBaseBottom, right: 92 }]}
             activeOpacity={0.85}
             onPress={() => router.push('/ocorrencias')}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.verOcorrencias')}
           >
             <View
               style={[
@@ -442,7 +594,11 @@ export default function MapaScreen() {
                 {latestOccurrence.title}
               </Text>
               <Text style={styles.incidentSubtitle} numberOfLines={1}>
-                {(latestOccurrence.location || 'Perto de você') + ' · ' + timeAgo(latestOccurrence.created_at) + ' · ' + occurrences.length + ' relato' + (occurrences.length === 1 ? '' : 's')}
+                {(latestOccurrence.location || t('mapa.pertoDeVoce')) +
+                  ' · ' +
+                  timeAgo(latestOccurrence.created_at) +
+                  ' · ' +
+                  tp('mapa.relatos', 'mapa.relatosPlural', occurrences.length)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -452,17 +608,31 @@ export default function MapaScreen() {
               <MaterialCommunityIcons name="shield-check-outline" size={22} color="#34C759" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.emptyCardText}>Nenhum alerta por perto agora</Text>
+              <Text style={styles.emptyCardText}>{t('mapa.semAlertas')}</Text>
             </View>
           </View>
         )}
 
-        {/* FABs secundárias: recentralizar + compartilhar localização */}
         <View style={[styles.fabColumn, { bottom: fabBaseBottom + 60 + 12 }]}>
-          <TouchableOpacity style={styles.fab} onPress={() => mapRef.current?.recenter()}>
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => {
+              haptics.toque();
+              mapRef.current?.recenter();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.recentralizarMapa')}
+          >
             <MaterialCommunityIcons name="crosshairs-gps" size={22} color={colors.primary ?? '#4285F4'} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.fab} onPress={shareLocation} disabled={sharing}>
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={shareLocation}
+            disabled={sharing}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.compartilharLocal')}
+            accessibilityState={{ disabled: sharing, busy: sharing }}
+          >
             {sharing ? (
               <ActivityIndicator color={colors.primary} size="small" />
             ) : (
@@ -471,31 +641,45 @@ export default function MapaScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* FAB grande: reportar ocorrência agora */}
         <TouchableOpacity
           style={[styles.reportFab, { bottom: fabBaseBottom + 8 }]}
           activeOpacity={0.85}
-          onPress={() => setReportVisible(true)}
+          onPress={() => {
+            haptics.toque();
+            setReportVisible(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('a11y.reportarOcorrencia')}
         >
           <MaterialCommunityIcons name="plus" size={30} color="#FFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Sheet de configurações: marcar áreas, raio de busca, exibir incidentes */}
+      {/* Sheet de configurações do mapa */}
       <Modal animationType="slide" transparent visible={settingsVisible} onRequestClose={() => setSettingsVisible(false)}>
         <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setSettingsVisible(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.sheetContent} onPress={() => {}}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Configurações do mapa</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setSettingsVisible(false)}>
+              <Text style={styles.sheetTitle} accessibilityRole="header">
+                {t('mapa.configuracoes')}
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setSettingsVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
+              >
                 <MaterialCommunityIcons name="close" size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.sectionLabel}>Marcar área no mapa</Text>
-              {ZONES.map((z) => {
+              <Text style={styles.sectionLabel}>{t('mapa.marcarArea')}</Text>
+              <Text style={[styles.toggleLabel, { fontSize: 12, marginBottom: 8, opacity: 0.75 }]}>
+                {t('mapa.marcarAreaAjuda')}
+              </Text>
+              {ZONAS_LEGENDA.map((z) => {
                 const selected = markColor === z.level;
                 const inactive = markColor !== null && !selected;
                 return (
@@ -504,35 +688,123 @@ export default function MapaScreen() {
                     style={[styles.legendaItem, inactive && styles.legendaItemInactive]}
                     onPress={() => selectMarkColor(z.level)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={t('a11y.filtro', { nome: z.rotulo })}
                   >
-                    <View style={[styles.legendaColorBox, { backgroundColor: z.color }]} />
-                    <Text style={styles.legendaItemText}>{z.label}</Text>
-                    {selected && <MaterialCommunityIcons name="check-circle" size={18} color={z.color} />}
+                    <View style={[styles.legendaColorBox, { backgroundColor: z.cor }]} />
+                    <Text style={styles.legendaItemText}>{z.rotulo}</Text>
+                    {selected && <MaterialCommunityIcons name="check-circle" size={18} color={z.cor} />}
                   </TouchableOpacity>
                 );
               })}
 
-              <Text style={styles.sectionLabel}>Raio de busca (Todos / Risco alto)</Text>
+              <Text style={styles.sectionLabel}>{t('mapa.raioBusca')}</Text>
               <View style={styles.radiusRow}>
-                {RADIUS_OPTIONS.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.chip, radius === opt.value && styles.chipActive]}
-                    onPress={() => setRadius(opt.value)}
-                  >
-                    <Text style={[styles.chipText, radius === opt.value && styles.chipTextActive]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {RADIUS_OPTIONS.map((valor) => {
+                  const rotulo = valor >= 1000 ? `${valor / 1000}km` : `${valor}m`;
+                  const ativo = radius === valor;
+                  return (
+                    <TouchableOpacity
+                      key={valor}
+                      style={[styles.chip, ativo && styles.chipActive]}
+                      onPress={() => {
+                        haptics.selecao();
+                        setRadius(valor);
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: ativo }}
+                      accessibilityLabel={t('a11y.filtro', { nome: rotulo })}
+                    >
+                      <Text style={[styles.chipText, ativo && styles.chipTextActive]}>{rotulo}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
-              <Text style={styles.sectionLabel}>Exibição</Text>
+              <Text style={styles.sectionLabel}>{t('mapa.periodo')}</Text>
+              <View style={styles.radiusRow}>
+                {PERIODOS.map((p) => {
+                  const rotulo = t(p.chave);
+                  const ativo = periodo === p.valor;
+                  return (
+                    <TouchableOpacity
+                      key={p.valor}
+                      style={[styles.chip, ativo && styles.chipActive]}
+                      onPress={() => {
+                        haptics.selecao();
+                        setPeriodo(p.valor);
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: ativo }}
+                      accessibilityLabel={t('a11y.filtro', { nome: rotulo })}
+                    >
+                      <Text style={[styles.chipText, ativo && styles.chipTextActive]}>{rotulo}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.sectionLabel}>{t('mapa.exibicao')}</Text>
+
               <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Mostrar incidentes no mapa</Text>
+                <Text style={styles.toggleLabel}>{t('mapa.mostrarIncidentes')}</Text>
                 <Switch
                   value={showIncidents}
-                  onValueChange={setShowIncidents}
+                  onValueChange={(v) => {
+                    haptics.selecao();
+                    setShowIncidents(v);
+                  }}
                   trackColor={{ true: colors.primary }}
                   thumbColor="#FFFFFF"
+                  accessibilityLabel={t('mapa.mostrarIncidentes')}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.toggleLabel}>{t('mapa.mostrarCalor')}</Text>
+                  <Text style={[styles.toggleLabel, { fontSize: 11, opacity: 0.7 }]}>
+                    {t('mapa.mostrarCalorAjuda')}
+                  </Text>
+                </View>
+                <Switch
+                  value={showHeat}
+                  onValueChange={(v) => {
+                    haptics.selecao();
+                    setShowHeat(v);
+                  }}
+                  trackColor={{ true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                  accessibilityLabel={t('mapa.mostrarCalor')}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>{t('mapa.mostrarPontosSeguros')}</Text>
+                <Switch
+                  value={showSafePlaces}
+                  onValueChange={(v) => {
+                    haptics.selecao();
+                    setShowSafePlaces(v);
+                  }}
+                  trackColor={{ true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                  accessibilityLabel={t('mapa.mostrarPontosSeguros')}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>{t('mapa.mostrarZonasComunidade')}</Text>
+                <Switch
+                  value={showZonasComunidade}
+                  onValueChange={(v) => {
+                    haptics.selecao();
+                    setShowZonasComunidade(v);
+                  }}
+                  trackColor={{ true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                  accessibilityLabel={t('mapa.mostrarZonasComunidade')}
                 />
               </View>
             </ScrollView>
@@ -546,66 +818,97 @@ export default function MapaScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Reportar ocorrência</Text>
-                <Text style={styles.modalSubtitle}>Sua localização atual será anexada</Text>
+                <Text style={styles.modalTitle} accessibilityRole="header">
+                  {t('mapa.reportar')}
+                </Text>
+                <Text style={styles.modalSubtitle}>{t('mapa.reportarSubtitulo')}</Text>
               </View>
-              <TouchableOpacity style={styles.closeButton} onPress={closeReportModal}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeReportModal}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
+              >
                 <MaterialCommunityIcons name="close" size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Gravidade</Text>
+            <Text style={styles.inputLabel}>{t('mapa.gravidade')}</Text>
             <View style={styles.typeRow}>
               <TouchableOpacity
                 style={[styles.typeChip, reportType === 'error' && { borderColor: '#E53935', backgroundColor: 'rgba(229,57,53,0.08)' }]}
-                onPress={() => setReportType('error')}
+                onPress={() => {
+                  haptics.selecao();
+                  setReportType('error');
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: reportType === 'error' }}
+                accessibilityLabel={t('mapa.emergencia')}
               >
                 <MaterialCommunityIcons name="alert-decagram" size={18} color="#E53935" />
-                <Text style={styles.typeChipText}>Emergência</Text>
+                <Text style={styles.typeChipText}>{t('mapa.emergencia')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeChip, reportType === 'warning' && { borderColor: '#FB8C00', backgroundColor: 'rgba(251,140,0,0.08)' }]}
-                onPress={() => setReportType('warning')}
+                onPress={() => {
+                  haptics.selecao();
+                  setReportType('warning');
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: reportType === 'warning' }}
+                accessibilityLabel={t('mapa.atencaoTipo')}
               >
                 <MaterialCommunityIcons name="alert" size={18} color="#FB8C00" />
-                <Text style={styles.typeChipText}>Atenção</Text>
+                <Text style={styles.typeChipText}>{t('mapa.atencaoTipo')}</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Categoria</Text>
+            <Text style={styles.inputLabel}>{t('mapa.categoria')}</Text>
             <View style={[styles.radiusRow, { flexWrap: 'wrap', marginBottom: 4 }]}>
-              {REPORT_CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[styles.chip, reportCategory === cat && styles.chipActive]}
-                  onPress={() => setReportCategory(cat)}
-                >
-                  <Text style={[styles.chipText, reportCategory === cat && styles.chipTextActive]}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
+              {CATEGORIAS_RELATO.map((chave) => {
+                const rotulo = t(`mapa.${chave}` as const);
+                const ativo = reportCategory === rotulo;
+                return (
+                  <TouchableOpacity
+                    key={chave}
+                    style={[styles.chip, ativo && styles.chipActive]}
+                    onPress={() => {
+                      haptics.selecao();
+                      setReportCategory(rotulo);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: ativo }}
+                    accessibilityLabel={rotulo}
+                  >
+                    <Text style={[styles.chipText, ativo && styles.chipTextActive]}>{rotulo}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {reportCategory === 'Outro' && (
+            {reportCategory === t('mapa.catOutro') && (
               <TextInput
                 style={[styles.input, { marginTop: 14 }]}
                 value={reportTitleCustom}
                 onChangeText={setReportTitleCustom}
-                placeholder="Qual foi a ocorrência?"
+                placeholder={t('mapa.qualOcorrencia')}
                 placeholderTextColor={colors.secondary}
                 maxLength={40}
+                accessibilityLabel={t('mapa.qualOcorrencia')}
               />
             )}
 
-            <Text style={[styles.inputLabel, { marginTop: 18 }]}>Descrição</Text>
+            <Text style={[styles.inputLabel, { marginTop: 18 }]}>{t('mapa.descricao')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={reportDescription}
               onChangeText={setReportDescription}
-              placeholder="Descreva o que aconteceu"
+              placeholder={t('mapa.descrevaOqueAconteceu')}
               placeholderTextColor={colors.secondary}
               multiline
               textAlignVertical="top"
               maxLength={160}
+              accessibilityLabel={t('mapa.descricao')}
             />
 
             <TouchableOpacity
@@ -613,13 +916,16 @@ export default function MapaScreen() {
               activeOpacity={0.85}
               onPress={submitReport}
               disabled={!canSubmitReport || reportSaving}
+              accessibilityRole="button"
+              accessibilityLabel={t('mapa.registrarOcorrencia')}
+              accessibilityState={{ disabled: !canSubmitReport || reportSaving, busy: reportSaving }}
             >
               {reportSaving ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
                   <MaterialCommunityIcons name="check-circle" size={20} color="#FFF" />
-                  <Text style={styles.saveButtonText}>Registrar ocorrência</Text>
+                  <Text style={styles.saveButtonText}>{t('mapa.registrarOcorrencia')}</Text>
                 </>
               )}
             </TouchableOpacity>

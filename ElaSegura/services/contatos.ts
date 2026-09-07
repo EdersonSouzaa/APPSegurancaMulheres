@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { toISO, exigirUsuaria } from './firestoreHelpers';
+import { comCache, salvarCache } from './cacheOffline';
 
 export type ContatoApp = {
   id: string;
@@ -33,29 +34,65 @@ const colContatos = (uid: string) => collection(db, 'usuarios', uid, 'contatos')
  * o createdAt esteja ausente ou ainda não tenha resolvido no servidor.
  *
  * O custo é irrelevante: são poucas dezenas de contatos, no máximo.
+ *
+ * A lista passa pelo cache local em disco. É a consulta em que isso mais
+ * importa: sem sinal, é dela que sai para quem o SOS deve ligar, e uma tela de
+ * contatos vazia numa emergência é indistinguível de "não tenho ninguém".
  */
 export async function listarContatos(): Promise<ContatoApp[]> {
   const user = exigirUsuaria();
-  const snap = await getDocs(colContatos(user.uid));
 
-  return snap.docs
-    .map((d) => {
+  const { dados } = await comCache<ContatoApp[]>(user.uid, 'contatos', async () => {
+    const snap = await getDocs(colContatos(user.uid));
+
+    return snap.docs
+      .map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          user_id: user.uid,
+          name: data.name ?? '',
+          phone: data.phone ?? '',
+          emergencial: data.emergencial ?? false,
+          created_at: toISO(data.createdAt),
+        };
+      })
+      .sort((a, b) => {
+        // Sem createdAt vai para o fim da lista, nunca some.
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+      });
+  });
+
+  return dados;
+}
+
+/**
+ * Invalida a cópia local depois de criar, editar ou excluir um contato.
+ *
+ * Sem isso, uma escrita offline ficaria na fila do Firestore enquanto o cache
+ * continuaria devolvendo a lista antiga — e a usuária veria o contato que
+ * acabou de salvar sumir ao trocar de tela.
+ */
+async function revalidarCache(uid: string) {
+  try {
+    const snap = await getDocs(colContatos(uid));
+    const lista = snap.docs.map((d) => {
       const data = d.data();
       return {
         id: d.id,
-        user_id: user.uid,
+        user_id: uid,
         name: data.name ?? '',
         phone: data.phone ?? '',
         emergencial: data.emergencial ?? false,
         created_at: toISO(data.createdAt),
       };
-    })
-    .sort((a, b) => {
-      // Sem createdAt vai para o fim da lista, nunca some.
-      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return tb - ta;
     });
+    await salvarCache(uid, 'contatos', lista);
+  } catch {
+    // Offline: a próxima leitura com rede reconstrói o cache sozinha.
+  }
 }
 
 export async function criarContato(
@@ -75,6 +112,8 @@ export async function criarContato(
     emergencial: !!emergencial,
     createdAt: serverTimestamp(),
   });
+
+  revalidarCache(user.uid);
 
   return {
     id: ref.id,
@@ -110,6 +149,8 @@ export async function atualizarContato(
     emergencial: !!dados.emergencial,
   });
 
+  revalidarCache(user.uid);
+
   return {
     id,
     user_id: user.uid,
@@ -130,6 +171,8 @@ export async function excluirContato(id: string) {
   }
 
   await deleteDoc(ref);
+  revalidarCache(user.uid);
+
   return { message: 'Contato excluído com sucesso', data: { id } };
 }
 

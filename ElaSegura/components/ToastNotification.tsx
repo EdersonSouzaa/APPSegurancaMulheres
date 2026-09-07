@@ -106,7 +106,9 @@ export const ToastNotification = ({
       ]}
     >
       <MaterialCommunityIcons name={theme.iconName} size={24} color={theme.iconColor} style={styles.icon} />
-      <Text style={styles.messageText}>{message}</Text>
+      <Text style={styles.messageText} accessibilityLiveRegion="polite" accessibilityRole="alert">
+        {message}
+      </Text>
     </Animated.View>
   );
 };

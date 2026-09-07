@@ -21,6 +21,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { entrar, registrar, recuperarSenha, mensagemErroAuth } from '../services/auth';
 import { sincronizarSessao } from '../services/session';
+import { onboardingConcluido } from '../lib/preferencias';
+import { haptics } from '../lib/haptics';
+import { useI18n } from '../context/I18nContext';
 import { SuccessPopup } from '../components/SuccessPopup';
 import { Colors } from '../constants/theme';
 
@@ -35,6 +38,7 @@ type AuthTab = 'login' | 'cadastro';
 
 export default function Login() {
   const router = useRouter();
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ tab?: string }>();
 
   const [activeTab, setActiveTab] = useState<AuthTab>(params.tab === 'cadastro' ? 'cadastro' : 'login');
@@ -75,13 +79,13 @@ export default function Login() {
     setLoginError('');
 
     if (!email || !password) {
-      setLoginError('Preencha todos os campos');
+      setLoginError(t('login.preenchaCampos'));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setLoginError('Digite um e-mail válido (ex: seuemail@dominio.com)');
+      setLoginError(t('login.emailInvalido'));
       return;
     }
 
@@ -91,9 +95,15 @@ export default function Login() {
       // Aguarda o espelho no AsyncStorage antes de navegar: a home lê 'user'
       // e 'userToken' já no primeiro render.
       await sincronizarSessao(user);
+      haptics.sucesso();
 
-      router.replace('/home');
+      // Primeiro acesso neste aparelho vai para o onboarding: é lá que a
+      // localização é liberada e o primeiro contato de emergência é
+      // cadastrado, sem os quais o SOS não funciona de verdade.
+      const jaConfigurou = await onboardingConcluido();
+      router.replace(jaConfigurou ? '/home' : '/onboarding');
     } catch (error: any) {
+      haptics.erro();
       setLoginError(mensagemErroAuth(error));
     }
   };
@@ -102,31 +112,33 @@ export default function Login() {
     setRegisterError('');
 
     if (!name || !registerEmail || !registerPassword || !confirmPassword) {
-      setRegisterError('Preencha todos os campos');
+      setRegisterError(t('login.preenchaCampos'));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(registerEmail)) {
-      setRegisterError('Digite um e-mail válido (ex: seuemail@dominio.com)');
+      setRegisterError(t('login.emailInvalido'));
       return;
     }
 
     if (registerPassword.length < 6 || registerPassword.length > 20) {
-      setRegisterError('A senha precisa ter entre 6 e 20 caracteres');
+      setRegisterError(t('login.senhaTamanho'));
       return;
     }
 
     if (registerPassword !== confirmPassword) {
-      setRegisterError('As senhas não coincidem');
+      setRegisterError(t('login.senhasNaoCoincidem'));
       return;
     }
 
     try {
       await registrar(name, registerEmail, registerPassword);
+      haptics.sucesso();
       setIsPopupVisible(true);
     } catch (error: any) {
-      Alert.alert('Erro no Cadastro', mensagemErroAuth(error));
+      haptics.erro();
+      Alert.alert(t('login.erroCadastro'), mensagemErroAuth(error));
     }
   };
 
@@ -134,21 +146,23 @@ export default function Login() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!resetEmail) {
-      Alert.alert('Erro', 'Digite o e-mail da sua conta.');
+      Alert.alert(t('comum.erro'), t('login.digiteEmailConta'));
       return;
     }
     if (!emailRegex.test(resetEmail)) {
-      Alert.alert('Erro', 'Formato de e-mail inválido.');
+      Alert.alert(t('comum.erro'), t('login.formatoEmailInvalido'));
       return;
     }
 
     setIsSendingReset(true);
     try {
       await recuperarSenha(resetEmail);
+      haptics.sucesso();
       setIsModalVisible(false);
       setIsSuccessVisible(true);
     } catch (error: any) {
-      Alert.alert('Erro', mensagemErroAuth(error));
+      haptics.erro();
+      Alert.alert(t('comum.erro'), mensagemErroAuth(error));
     } finally {
       setIsSendingReset(false);
     }
@@ -162,15 +176,17 @@ export default function Login() {
 
       <SuccessPopup
         visible={isSuccessVisible}
-        title="E-mail enviado!"
-        message="Se existir uma conta com esse e-mail, você receberá um link para criar uma nova senha. Confira também o spam."
+        title={t('login.emailEnviadoTitulo')}
+        message={t('login.emailEnviadoTexto')}
+        continueLabel={t('comum.continuar')}
         onContinue={() => setIsSuccessVisible(false)}
       />
 
       <SuccessPopup
         visible={isPopupVisible}
-        title="Cadastro realizado!"
-        message="Sua conta foi criada com sucesso. Agora é só entrar."
+        title={t('login.cadastroTitulo')}
+        message={t('login.cadastroTexto')}
+        continueLabel={t('comum.continuar')}
         onContinue={() => {
           setIsPopupVisible(false);
           switchTab('login');
@@ -183,48 +199,61 @@ export default function Login() {
             <View style={styles.logoBadge}>
               <Image source={LOGO_IMAGE} style={styles.logoImage} resizeMode="contain" />
             </View>
-            <Text style={styles.title}>{isLogin ? 'Bem-vinda de volta' : 'Crie sua conta'}</Text>
+            <Text style={styles.title} accessibilityRole="header">
+              {isLogin ? t('login.tituloLogin') : t('login.tituloCadastro')}
+            </Text>
             <Text style={styles.subtitle}>
-              {isLogin
-                ? 'Entre para manter sua rede de proteção sempre ativa.'
-                : 'Cadastre-se para começar a usar sua rede de proteção.'}
+              {isLogin ? t('login.subtituloLogin') : t('login.subtituloCadastro')}
             </Text>
           </View>
 
           <View style={styles.tabSwitcher}>
             <TouchableOpacity
               style={[styles.tabButton, isLogin && styles.tabButtonActive]}
-              onPress={() => switchTab('login')}
+              onPress={() => {
+                haptics.selecao();
+                switchTab('login');
+              }}
               activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isLogin }}
+              accessibilityLabel={t('login.abaEntrar')}
             >
-              <Text style={[styles.tabButtonText, isLogin && styles.tabButtonTextActive]}>Entrar</Text>
+              <Text style={[styles.tabButtonText, isLogin && styles.tabButtonTextActive]}>{t('login.abaEntrar')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tabButton, !isLogin && styles.tabButtonActive]}
-              onPress={() => switchTab('cadastro')}
+              onPress={() => {
+                haptics.selecao();
+                switchTab('cadastro');
+              }}
               activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: !isLogin }}
+              accessibilityLabel={t('login.abaCadastrar')}
             >
-              <Text style={[styles.tabButtonText, !isLogin && styles.tabButtonTextActive]}>Cadastrar</Text>
+              <Text style={[styles.tabButtonText, !isLogin && styles.tabButtonTextActive]}>{t('login.abaCadastrar')}</Text>
             </TouchableOpacity>
           </View>
 
           {isLogin ? (
             <View style={styles.form}>
-              <Text style={styles.label}>E-mail</Text>
+              <Text style={styles.label}>{t('login.email')}</Text>
               <View style={styles.inputContainer}>
                 <MaterialCommunityIcons name="email-outline" size={20} color={colors.primary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="seuemail@email.com"
+                  placeholder={t('login.emailPlaceholder')}
                   placeholderTextColor={colors.secondary}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  accessibilityLabel={t('login.email')}
                 />
               </View>
 
-              <Text style={styles.label}>Senha</Text>
+              <Text style={styles.label}>{t('login.senha')}</Text>
               <View style={styles.inputContainer}>
                 <MaterialCommunityIcons name="lock-outline" size={20} color={colors.primary} style={styles.inputIcon} />
                 <TextInput
@@ -234,8 +263,13 @@ export default function Login() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
+                  accessibilityLabel={t('login.senha')}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? t('a11y.ocultarSenha') : t('a11y.mostrarSenha')}
+                >
                   <MaterialCommunityIcons
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                     size={20}
@@ -249,36 +283,46 @@ export default function Login() {
               <TouchableOpacity
                 style={styles.forgotPassword}
                 onPress={() => {
+                  haptics.toque();
                   setResetEmail(email);
                   setIsModalVisible(true);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('login.esqueciSenha')}
               >
-                <Text style={styles.forgotPasswordText}>Esqueci minha senha</Text>
+                <Text style={styles.forgotPasswordText}>{t('login.esqueciSenha')}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.primaryButtonWrapper} onPress={handleLogin} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.primaryButtonWrapper}
+                onPress={handleLogin}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('login.abaEntrar')}
+              >
                 <LinearGradient
                   colors={[colors.primary, '#C2185B']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.primaryButton}
                 >
-                  <Text style={styles.primaryButtonText}>Entrar →</Text>
+                  <Text style={styles.primaryButtonText}>{t('login.entrarBotao')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.form}>
-              <Text style={styles.label}>Nome completo</Text>
+              <Text style={styles.label}>{t('login.nomeCompleto')}</Text>
               <View style={styles.inputContainer}>
                 <MaterialCommunityIcons name="account-outline" size={20} color={colors.primary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Seu nome completo"
+                  placeholder={t('login.nomePlaceholder')}
                   placeholderTextColor={colors.secondary}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
+                  accessibilityLabel={t('login.nomeCompleto')}
                 />
               </View>
 
@@ -331,23 +375,33 @@ export default function Login() {
 
               {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
 
-              <TouchableOpacity style={[styles.primaryButtonWrapper, { marginTop: 8 }]} onPress={handleRegister} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={[styles.primaryButtonWrapper, { marginTop: 8 }]}
+                onPress={handleRegister}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('login.abaCadastrar')}
+              >
                 <LinearGradient
                   colors={[colors.primary, '#C2185B']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.primaryButton}
                 >
-                  <Text style={styles.primaryButtonText}>Cadastrar →</Text>
+                  <Text style={styles.primaryButtonText}>{t('login.cadastrarBotao')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>{isLogin ? 'Não tem conta? ' : 'Já tem conta? '}</Text>
-            <TouchableOpacity onPress={() => switchTab(isLogin ? 'cadastro' : 'login')}>
-              <Text style={styles.footerLink}>{isLogin ? 'Cadastre-se' : 'Entrar'}</Text>
+            <Text style={styles.footerText}>{isLogin ? t('login.naoTemConta') : t('login.jaTemConta')}</Text>
+            <TouchableOpacity
+              onPress={() => switchTab(isLogin ? 'cadastro' : 'login')}
+              accessibilityRole="button"
+              accessibilityLabel={isLogin ? t('login.cadastreSe') : t('login.entrar')}
+            >
+              <Text style={styles.footerLink}>{isLogin ? t('login.cadastreSe') : t('login.entrar')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -363,26 +417,31 @@ export default function Login() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Redefinir Senha</Text>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <Text style={styles.modalTitle} accessibilityRole="header">
+                {t('login.redefinirSenha')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.fecharModal')}
+              >
                 <MaterialCommunityIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalDescription}>
-              Enviaremos um link seguro para o seu e-mail. É por ele que você cria uma nova senha.
-            </Text>
+            <Text style={styles.modalDescription}>{t('login.redefinirDescricao')}</Text>
 
             <View style={styles.modalInputContainer}>
               <MaterialCommunityIcons name="email-outline" size={24} color={colors.secondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.modalInput}
-                placeholder="seuemail@email.com"
+                placeholder={t('login.emailPlaceholder')}
                 placeholderTextColor={colors.secondary}
                 value={resetEmail}
                 onChangeText={setResetEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                accessibilityLabel={t('login.email')}
               />
             </View>
 
@@ -391,9 +450,12 @@ export default function Login() {
               onPress={handleRecoverPassword}
               activeOpacity={0.8}
               disabled={isSendingReset}
+              accessibilityRole="button"
+              accessibilityLabel={t('login.enviarLink')}
+              accessibilityState={{ disabled: isSendingReset, busy: isSendingReset }}
             >
               <Text style={styles.modalButtonText}>
-                {isSendingReset ? 'Enviando...' : 'Enviar link de redefinição'}
+                {isSendingReset ? t('login.enviando') : t('login.enviarLink')}
               </Text>
             </TouchableOpacity>
           </View>

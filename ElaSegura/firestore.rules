@@ -23,8 +23,102 @@ service cloud.firestore {
                     && request.resource.data.type in ['error', 'warning']
                     && request.resource.data.title is string
                     && request.resource.data.title.size() > 0;
+
+      // A autora edita e apaga o proprio relato.
       allow update, delete: if logada()
                     && resource.data.userId == request.auth.uid;
+
+      // Validacao comunitaria: qualquer logada mexe nos contadores, e SO neles.
+      //
+      // A integridade do placar e garantida aqui, nao no app: o servidor so
+      // aceita a variacao coerente com o voto que a pessoa ja tem (ou com a
+      // ausencia dele), lido do documento em validacoes/{uid}. Assim, mesmo
+      // chamando a API direto, ninguem consegue votar duas vezes nem somar
+      // mais de 1 por vez.
+      allow update: if logada()
+                    && resource.data.userId != request.auth.uid
+                    && somenteContadores()
+                    && naoNegativos()
+                    && transicaoDeVotoValida(id);
+    }
+
+    function somenteContadores() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['confirmacoes', 'refutacoes']);
+    }
+
+    function naoNegativos() {
+      return request.resource.data.get('confirmacoes', 0) >= 0
+          && request.resource.data.get('refutacoes', 0) >= 0;
+    }
+
+    function delta(campo) {
+      return request.resource.data.get(campo, 0) - resource.data.get(campo, 0);
+    }
+
+    function caminhoDoVoto(id) {
+      return /databases/$(database)/documents/ocorrencias/$(id)/validacoes/$(request.auth.uid);
+    }
+
+    function jaVotou(id) { return exists(caminhoDoVoto(id)); }
+    function votoAtual(id) { return get(caminhoDoVoto(id)).data.voto; }
+
+    function transicaoDeVotoValida(id) {
+      return
+        // Primeiro voto: +1 em exatamente um dos contadores.
+        (!jaVotou(id) && (
+            (delta('confirmacoes') == 1 && delta('refutacoes') == 0)
+         || (delta('confirmacoes') == 0 && delta('refutacoes') == 1)))
+        // Trocou de lado: -1 de onde estava, +1 para onde foi.
+        || (jaVotou(id) && votoAtual(id) == 'confirma'
+            && delta('confirmacoes') == -1 && delta('refutacoes') == 1)
+        || (jaVotou(id) && votoAtual(id) == 'refuta'
+            && delta('refutacoes') == -1 && delta('confirmacoes') == 1)
+        // Retirou o voto: -1 de onde estava, o outro parado.
+        || (jaVotou(id) && votoAtual(id) == 'confirma'
+            && delta('confirmacoes') == -1 && delta('refutacoes') == 0)
+        || (jaVotou(id) && votoAtual(id) == 'refuta'
+            && delta('refutacoes') == -1 && delta('confirmacoes') == 0);
+    }
+
+    // Um documento por pessoa por relato — e o que faz "um voto por pessoa"
+    // ser um fato do banco, e nao uma regra que o app promete cumprir.
+    // O match com {caminho=**} tambem habilita a consulta de grupo de colecao
+    // que carrega todos os votos da usuaria de uma vez.
+    match /{caminho=**}/validacoes/{votante} {
+      allow read: if logada();
+      allow create: if dona(votante)
+                    && request.resource.data.voto in ['confirma', 'refuta']
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if dona(votante)
+                    && request.resource.data.voto in ['confirma', 'refuta']
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if dona(votante);
+    }
+
+    // Areas marcadas no mapa, compartilhadas com a comunidade.
+    // Qualquer logada le; so a autora remove a propria marcacao.
+    match /zonas/{id} {
+      allow read: if logada();
+      allow create: if logada()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.level in ['safe', 'alert', 'danger']
+                    && request.resource.data.lat is number
+                    && request.resource.data.lng is number
+                    && request.resource.data.radius is number
+                    && request.resource.data.radius >= 50
+                    && request.resource.data.radius <= 2000
+                    && request.resource.data.geohash is string;
+      allow update: if false;
+      allow delete: if logada() && resource.data.userId == request.auth.uid;
+    }
+
+    // Pontos de apoio (delegacias, saude 24h, acolhimento).
+    // Catalogo curado pelo time: o app so le, a carga e feita pelo console
+    // do Firebase ou por uma conta de servico.
+    match /pontosSeguros/{id} {
+      allow read: if logada();
+      allow write: if false;
     }
 
     match /sos/{id} {

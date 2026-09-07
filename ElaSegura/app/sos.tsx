@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Linking, Alert, ScrollView, Platform, Share, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, Linking, Alert, ScrollView, Platform, Share, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -229,18 +229,12 @@ const SOSScreen = () => {
             Não se preocupe — seu círculo de confiança será avisado em instantes.
           </Text>
 
-          <View style={styles.progressRingWrapper}>
-            <CircularProgress
-              size={200}
-              strokeWidth={14}
-              progress={elapsedSeconds / SEND_DURATION}
-              color={colors.primary}
-              trackColor={isDarkMode ? '#3A2530' : '#F9D7DE'}
-            >
-              <Text style={styles.progressCountdown}>{formatSeconds(elapsedSeconds)}</Text>
-              <Text style={styles.progressLabel}>SEGUNDOS</Text>
-            </CircularProgress>
-          </View>
+          <SendingRing
+            styles={styles}
+            colors={colors}
+            isDarkMode={isDarkMode}
+            remaining={Math.max(1, SEND_DURATION - elapsedSeconds)}
+          />
 
           <View style={styles.contactsList}>
             {contatosNotificados.length === 0 ? (
@@ -441,6 +435,95 @@ const SOSScreen = () => {
 
       <EmergencyCallSheet visible={emergencyVisible} onClose={() => setEmergencyVisible(false)} />
     </SafeAreaView>
+  );
+};
+
+/**
+ * O carregamento dos 5 segundos entre tocar no SOS e o alerta ficar ativo.
+ *
+ * São três animações somadas: o anel deslizando do zero ao fim em SEND_DURATION,
+ * um halo que respira atrás dele e o número que dá uma batidinha a cada segundo
+ * em vez de trocar seco.
+ */
+const SendingRing = ({ styles, colors, isDarkMode, remaining }: any) => {
+  const entrada = useRef(new Animated.Value(0)).current;
+  const halo = useRef(new Animated.Value(0)).current;
+  const digito = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(entrada, {
+      toValue: 1,
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(halo, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(halo, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [entrada, halo]);
+
+  useEffect(() => {
+    digito.setValue(0.72);
+    Animated.spring(digito, {
+      toValue: 1,
+      friction: 4.5,
+      tension: 90,
+      useNativeDriver: true,
+    }).start();
+  }, [remaining, digito]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.progressRingWrapper,
+        {
+          opacity: entrada,
+          transform: [
+            { scale: entrada.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) },
+          ],
+        },
+      ]}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.sendingHalo,
+          {
+            backgroundColor: colors.primary,
+            opacity: halo.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0] }),
+            transform: [
+              { scale: halo.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.28] }) },
+            ],
+          },
+        ]}
+      />
+
+      <CircularProgress
+        size={200}
+        strokeWidth={14}
+        progress={1}
+        duration={SEND_DURATION * 1000}
+        color={colors.primary}
+        colorEnd="#C2185B"
+        trackColor={isDarkMode ? '#3A2530' : '#F9D7DE'}
+      >
+        <Animated.Text style={[styles.progressCountdown, { transform: [{ scale: digito }] }]}>
+          {remaining}
+        </Animated.Text>
+        <Text style={styles.progressLabel}>{remaining === 1 ? 'SEGUNDO' : 'SEGUNDOS'}</Text>
+      </CircularProgress>
+    </Animated.View>
   );
 };
 

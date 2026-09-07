@@ -206,9 +206,18 @@ export const getStyles = (isDarkMode: boolean, colors: any) => StyleSheet.create
   },
   progressRingWrapper: {
     marginBottom: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Halo que respira atrás do anel enquanto o alerta e enviado.
+  sendingHalo: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
   },
   progressCountdown: {
-    fontSize: 34,
+    fontSize: 44,
     fontWeight: 'bold',
     color: colors.primary,
   },
